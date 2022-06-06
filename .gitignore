@@ -30,3 +30,14 @@
 *.exe
 *.out
 *.app
+/.vs
+/D3D12 Tech Demo/.vs/D3D12 Tech Demo/v17
+/D3D12 Tech Demo/VS2022/.vs/D3D12 Tech Demo
+*.tlog
+*.log
+*.recipe
+*.ilk
+*.idb
+*.pdb
+/D3D12 Tech Demo/VS2022/D3D12 Tech Demo/x64/Debug
+*.user

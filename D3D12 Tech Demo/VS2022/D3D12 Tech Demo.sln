@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32526.322
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "D3D12 Tech Demo", "D3D12 Tech Demo\D3D12 Tech Demo.vcxproj", "{629007C6-62A3-45A7-BC10-E9BF94000FC4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{629007C6-62A3-45A7-BC10-E9BF94000FC4}.Debug|x64.ActiveCfg = Debug|x64
+		{629007C6-62A3-45A7-BC10-E9BF94000FC4}.Debug|x64.Build.0 = Debug|x64
+		{629007C6-62A3-45A7-BC10-E9BF94000FC4}.Release|x64.ActiveCfg = Release|x64
+		{629007C6-62A3-45A7-BC10-E9BF94000FC4}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7A2F90FD-2F1E-46E7-A85C-51FFAD3BB144}
+	EndGlobalSection
+EndGlobal
