@@ -228,6 +228,9 @@ public:
 
 protected:
 
+	/// <summary>
+	/// Init Desktop Window
+	/// </summary>
 	FUNC_GAME_TASK(OsInit)
 	{
 		HINSTANCE pHInstance = GetModuleHandle(NULL);
@@ -267,10 +270,12 @@ protected:
 
 		return APP_FORWARD;
 	}
+	/// <summary></summary>
 	FUNC_GAME_TASK(OsUpdate)
 	{
 		return APP_FORWARD;
 	}
+	/// <summary>Handle Window Messages</summary>
 	FUNC_GAME_TASK(OsFrame)
 	{
 		static MSG s_sMsg = { 0 };
@@ -278,17 +283,18 @@ protected:
 		{
 			TranslateMessage(&s_sMsg);
 			DispatchMessage(&s_sMsg);
-			return APP_PAUSE;
+			if (s_sMsg.message == WM_QUIT) return APP_QUIT; else return APP_PAUSE;
 		}
 
-		if (s_sMsg.message == WM_QUIT) return APP_QUIT; else return APP_FORWARD;
 		return APP_FORWARD;
 	}
+	/// <summary></summary>
 	FUNC_GAME_TASK(OsPreRelease)
 	{
 		OutputDebugStringA("App_Windows::OsPreRelease");
 		return APP_FORWARD;
 	}
+	/// <summary></summary>
 	FUNC_GAME_TASK(OsRelease)
 	{
 		OutputDebugStringA("App_Windows::OsRelease");
@@ -358,7 +364,23 @@ public:
 	{
 		return APP_FORWARD;
 	}
-	FUNC_GAME_TASK(OnFrame)
+	FUNC_GAME_TASK(OnRenderPipeline0)
+	{
+		return APP_FORWARD;
+	}
+	FUNC_GAME_TASK(OnRenderPipeline1)
+	{
+		return APP_FORWARD;
+	}
+	FUNC_GAME_TASK(OnRenderPipeline2)
+	{
+		return APP_FORWARD;
+	}
+	FUNC_GAME_TASK(OnRenderAudio)
+	{
+		return APP_FORWARD;
+	}
+	FUNC_GAME_TASK(OnPostRender)
 	{
 		return APP_FORWARD;
 	}
@@ -374,5 +396,9 @@ public:
 };
 
 std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Init = { { App::OnInit } };
-std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Runtime = { { App::OnUpdate }, { App::OnFrame } };
+std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Runtime = { 
+	{ App::OnUpdate }, 
+	{ App::OnRenderPipeline0, App::OnRenderPipeline1, App::OnRenderPipeline2, App::OnRenderAudio },
+	{ App::OnPostRender }
+};
 std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Destroy = { { App::OnRelease } };
