@@ -8,8 +8,10 @@
 #include <future>
 
 #ifdef _WIN32
-#define TRACE_CODE { wchar_t buf[128]; wsprintfW(buf, L"%s(%u) : %s", __FILEW__, __LINE__, __FUNCTIONW__); OutputDebugStringW(buf); }
-#define DECLARE_TASK_FUTURE(t) std::packaged_task<signed(GameTime&)> cPTask##t(##t); std::future<signed> cFuture##t = cPTask##t.get_future();
+#define TRACE_UINT(a) { wchar_t buf[128]; wsprintfW(buf, L"%s:%u:0x%x", L#a, a, a); OutputDebugStringW(buf); }
+#define TRACE_HEX(a) { wchar_t buf[128]; wsprintfW(buf,  L"%s:%x", L#a, a); OutputDebugStringW(buf); }
+#define TRACE_FLOAT(a) { wchar_t buf[128]; swprintf(buf, 128, L"%s:%f", L#a, a); OutputDebugStringW(buf); }
+#define TRACE_CODE { wchar_t buf[128]; wsprintfW(buf, L"(%u) : %s", __LINE__, __FUNCTIONW__); OutputDebugStringW(buf); }
 #define APP_FORWARD S_OK
 #define APP_PAUSE S_FALSE
 #define APP_QUIT E_ABORT
@@ -30,106 +32,171 @@ struct GameTime
 typedef signed(*GAME_TASK)(GameTime& sInfo);
 
 /// <summary>
-/// App Basics Parent Classs.
+/// App Basics Parent Class.
 /// </summary>
-class App_Skeleton
+class App_Taskhandler
 {
 public:
-	explicit App_Skeleton(
-		GAME_TASK OsInit,
-		GAME_TASK OsUpdate,
-		GAME_TASK OsFrame,
-		GAME_TASK OsRelease,
-		GAME_TASK OnInit,
-		GAME_TASK OnUpdate,
-		GAME_TASK OnFrame,
-		GAME_TASK OnRelease)
-		: _OsInit(std::move(OsInit))
-		, _OsUpdate(std::move(OsUpdate))
-		, _OsFrame(std::move(OsFrame))
-		, _OsRelease(std::move(OsRelease))
-		, _OnInit(std::move(OnInit))
-		, _OnUpdate(std::move(OnUpdate))
-		, _OnFrame(std::move(OnFrame))
-		, _OnRelease(std::move(OnRelease))
+	static constexpr unsigned INIT = 0;
+	static constexpr unsigned RUNTIME = 1;
+	static constexpr unsigned DESTROY = 2;
+
+	explicit App_Taskhandler(
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Init,
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Runtime,
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Destroy
+	)
 	{
-		Run();
+		// add tasks
+		Add(aavTasks_Init, aavTasks_Runtime, aavTasks_Destroy);
 	}
-	virtual ~App_Skeleton() {}
+	virtual ~App_Taskhandler() {}
 
 protected:
 
+	/// <summary>
+	/// Add tasks to the list
+	/// </summary>
+	/// <param name="bInsertFirst">true if taskblocks should be inserted at begin</param>
+	void Add(
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Init,
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Runtime,
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Destroy,
+		bool bInsertFirst = false
+	)
+	{
+		// pointer helpers for following operation
+		std::vector<std::vector<GAME_TASK>>* paav = nullptr;
+		std::vector<std::vector<std::packaged_task<signed(GameTime&)>>>* paac = nullptr;
+
+		// create lists of task blocks
+		for (unsigned uIx : {INIT, RUNTIME, DESTROY})
+		{
+			// set helper pointers
+			switch (uIx)
+			{
+			case INIT:
+				paav = &aavTasks_Init;
+				paac = &aacTasks_Init;
+				break;
+			case RUNTIME:
+				paav = &aavTasks_Runtime;
+				paac = &aacTasks_Runtime;
+				break;
+			case DESTROY:
+				paav = &aavTasks_Destroy;
+				paac = &aacTasks_Destroy;
+				break;
+			default: continue; break;
+			}
+
+			// loop through task functions
+			for (std::vector<GAME_TASK>& av : *paav)
+			{
+
+				// create task block and add to list
+				std::vector<std::packaged_task<signed(GameTime&)>> acTaskblock;
+				for (GAME_TASK& v : av)
+					acTaskblock.push_back(std::packaged_task<signed(GameTime&)>(v));
+
+				// add the block at begin (?)
+				if (bInsertFirst)
+					paac->insert(paac->begin(), std::move(acTaskblock));
+				else
+					paac->push_back(std::move(acTaskblock));
+			}
+		}
+		aavTasks_Init.clear();
+		aavTasks_Runtime.clear();
+		aavTasks_Destroy.clear();
+	}
+
+	/// <summary>
+	/// Task Handler... Init->Runtime->Destroy
+	/// </summary>
 	void Run()
 	{
 		GameTime sTime = {};
+		std::vector<std::vector<std::packaged_task<signed(GameTime&)>>>* paac = nullptr;
+		signed nFuture = APP_FORWARD;
 
-		// set packaged tasks and futures
-		DECLARE_TASK_FUTURE(_OsInit);
-		DECLARE_TASK_FUTURE(_OnInit);
-		DECLARE_TASK_FUTURE(_OsUpdate);
-		DECLARE_TASK_FUTURE(_OnUpdate);
-		DECLARE_TASK_FUTURE(_OsFrame);
-		DECLARE_TASK_FUTURE(_OnFrame);
-		DECLARE_TASK_FUTURE(_OsRelease);
-		DECLARE_TASK_FUTURE(_OnRelease);
-
-		// spawn Operating System Init
-		cPTask_OsInit(sTime);
-		if (cFuture_OsInit.get() == 0)
+		// execute lists of task blocks
+		for (unsigned uIx : {INIT, RUNTIME, DESTROY})
 		{
-			// spawn App Init
-			cPTask_OnInit(sTime);
+			// any error present ?
+			if (nFuture != APP_ERROR) nFuture = APP_FORWARD;
 
-			if (cFuture_OnInit.get() == 0)
+			// set helper pointer
+			switch (uIx)
 			{
-				signed nFuture = 0;
-				while ((nFuture != APP_QUIT) && (nFuture != APP_ERROR))
-				{
-					// spawn Os Update
-					cPTask_OsUpdate.reset();
-					cFuture_OsUpdate = cPTask_OsUpdate.get_future();
-					cPTask_OsUpdate(sTime);
-					nFuture = cFuture_OsUpdate.get();
-					if (nFuture == APP_PAUSE) continue; else if (nFuture != APP_FORWARD) break;
-
-					// spawn App Update
-					cPTask_OnUpdate.reset();
-					cFuture_OnUpdate = cPTask_OnUpdate.get_future();
-					cPTask_OnUpdate(sTime);
-					nFuture = cFuture_OnUpdate.get();
-					if (nFuture == APP_PAUSE) continue; else if (nFuture != APP_FORWARD) break;
-
-					// spawn Os Frame
-					cPTask_OsFrame.reset();
-					cFuture_OsFrame = cPTask_OsFrame.get_future();
-					cPTask_OsFrame(sTime);
-					nFuture = cFuture_OsFrame.get();
-					if (nFuture == APP_PAUSE) continue; else if (nFuture != APP_FORWARD) break;
-
-					// spawn App Frame
-					cPTask_OnFrame.reset();
-					cFuture_OnFrame = cPTask_OnFrame.get_future();
-					cPTask_OnFrame(sTime);
-					nFuture = cFuture_OnFrame.get();
-					if (nFuture == APP_PAUSE) continue; else if (nFuture != APP_FORWARD) break;
-				}
+			case INIT: paac = &aacTasks_Init; break;
+			case RUNTIME: paac = &aacTasks_Runtime; break;
+			case DESTROY: paac = &aacTasks_Destroy; break;
+			default: continue; break;
 			}
+
+			do
+			{
+				// loop through task blocks
+				for (std::vector<std::packaged_task<signed(GameTime&)>>& aac : *paac)
+				{
+					// pause this task block ?
+					if (nFuture == APP_PAUSE) continue;
+
+					// error or quit ?
+					if (((nFuture == APP_ERROR) || (nFuture == APP_QUIT)) && (uIx != DESTROY)) continue;
+
+					// loop through tasks
+					std::vector<std::future<signed>> acFutures;
+					for (std::packaged_task<signed(GameTime&)>& ac : aac)
+					{
+						// reset task, add future
+						ac.reset();
+						acFutures.push_back(ac.get_future());
+
+						// execute
+						ac(sTime);
+					}
+
+					// loop through futures to synchronize
+					for (std::future<signed>& cFuture : acFutures)
+					{
+						signed nFutureCurrent = cFuture.get();
+						switch (nFutureCurrent)
+						{
+						case APP_FORWARD: break;
+						case APP_PAUSE:
+							if ((nFuture != APP_ERROR) && (nFuture != APP_QUIT))
+								nFuture = nFutureCurrent;
+							break;
+						case APP_QUIT:
+							if (nFuture != APP_ERROR)
+								nFuture = nFutureCurrent;
+							break;
+						case APP_ERROR:
+							nFuture = nFutureCurrent;
+							break;
+						default: break;
+						}
+					}
+				}
+
+				// end pause
+				if (nFuture == APP_PAUSE) nFuture = APP_FORWARD;
+
+			} while ((uIx == RUNTIME) && (nFuture != APP_QUIT) && (nFuture != APP_ERROR));
 		}
 	}
 
-	/// <summary>True if video rendering is enabled</summary>
-	static bool m_bRender;
-
 private:
 	/// <summary>
-	/// Tasks for Operating System and App itself.
+	/// Task blocks for Initialization, Runtime and Application End
+	/// Each vector of tasks (=taskblock) will be executed simultanely.
+	/// Each vector of vectors will be executed sequentually.
 	/// </summary>
-	GAME_TASK
-		_OsInit, _OsUpdate, _OsFrame, _OsRelease,
-		_OnInit, _OnUpdate, _OnFrame, _OnRelease;
+	std::vector<std::vector<std::packaged_task<signed(GameTime&)>>>
+		aacTasks_Init, aacTasks_Runtime, aacTasks_Destroy;
 };
-
-bool App_Skeleton::m_bRender;
 
 #ifdef _WIN32
 #define APP App_Windows
@@ -137,17 +204,26 @@ bool App_Skeleton::m_bRender;
 /// <summary>
 /// Windows app skeleton
 /// </summary>
-class App_Windows : protected App_Skeleton
+class App_Windows : protected App_Taskhandler
 {
 public:
 	explicit App_Windows(
-		GAME_TASK OnInit,
-		GAME_TASK OnUpdate,
-		GAME_TASK OnFrame,
-		GAME_TASK OnRelease) : App_Skeleton(
-			OsInit, OsUpdate, OsFrame, OsRelease,
-			std::move(OnInit), std::move(OnUpdate), std::move(OnFrame), std::move(OnRelease))
-		{ m_bRender = false; }
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Init,
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Runtime,
+		std::vector<std::vector<GAME_TASK>>& aavTasks_Destroy
+	) : App_Taskhandler(aavTasks_Init, aavTasks_Runtime, aavTasks_Destroy)
+	{
+		// create and add the task function blocks for any Windows action
+		std::vector<std::vector<GAME_TASK>> aavTasks_Init_this = { { OsInit } };
+		std::vector<std::vector<GAME_TASK>> aavTasks_Runtime_this = { { OsFrame }, { OsUpdate } };
+		std::vector<std::vector<GAME_TASK>> aavTasks_Destroy_this = { { OsPreRelease } };
+		Add(aavTasks_Init_this, aavTasks_Runtime_this, aavTasks_Destroy_this, true);
+		aavTasks_Destroy_this = { { OsRelease } };
+		Add(aavTasks_Init_this, aavTasks_Runtime_this, aavTasks_Destroy_this, false);
+
+		// .. and execute the app
+		Run();
+	}
 	virtual ~App_Windows() {}
 
 protected:
@@ -208,6 +284,11 @@ protected:
 		if (s_sMsg.message == WM_QUIT) return APP_QUIT; else return APP_FORWARD;
 		return APP_FORWARD;
 	}
+	FUNC_GAME_TASK(OsPreRelease)
+	{
+		OutputDebugStringA("App_Windows::OsPreRelease");
+		return APP_FORWARD;
+	}
 	FUNC_GAME_TASK(OsRelease)
 	{
 		OutputDebugStringA("App_Windows::OsRelease");
@@ -255,11 +336,9 @@ protected:
 
 HWND App_Windows::m_pHwnd = nullptr;
 
-
-#else 
+#else
 #error "OS not supported!"
 #endif
-
 
 /// <summary>
 /// Main Application
@@ -267,7 +346,7 @@ HWND App_Windows::m_pHwnd = nullptr;
 class App : protected APP
 {
 public:
-	App() : APP(OnInit, OnUpdate, OnFrame, OnRelease) {}
+	App() : APP(m_aavTasks_Init, m_aavTasks_Runtime, m_aavTasks_Destroy) {}
 	~App() {}
 
 	FUNC_GAME_TASK(OnInit)
@@ -277,12 +356,10 @@ public:
 	}
 	FUNC_GAME_TASK(OnUpdate)
 	{
-		OutputDebugStringA("App::OnUpdate");
 		return APP_FORWARD;
 	}
 	FUNC_GAME_TASK(OnFrame)
 	{
-		OutputDebugStringA("App::OnFrame");
 		return APP_FORWARD;
 	}
 	FUNC_GAME_TASK(OnRelease)
@@ -290,5 +367,12 @@ public:
 		OutputDebugStringA("App::OnRelease");
 		return APP_FORWARD;
 	}
+
+	static std::vector<std::vector<GAME_TASK>> m_aavTasks_Init;
+	static std::vector<std::vector<GAME_TASK>> m_aavTasks_Runtime;
+	static std::vector<std::vector<GAME_TASK>> m_aavTasks_Destroy;
 };
 
+std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Init = { { App::OnInit } };
+std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Runtime = { { App::OnUpdate }, { App::OnFrame } };
+std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Destroy = { { App::OnRelease } };
