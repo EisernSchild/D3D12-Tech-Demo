@@ -368,7 +368,6 @@ private:
 
 #ifdef _WIN32
 #define APP_Os App_Windows
-#define APP_GfxLib App_D3D12
 
 /// <summary>
 /// Windows app skeleton
@@ -499,102 +498,6 @@ protected:
 };
 
 HWND App_Windows::m_pHwnd = nullptr;
-
-/// <summary>
-/// D3D12 application
-/// </summary>
-class App_D3D12 : protected App_Windows
-{
-public:
-	explicit App_D3D12(
-		std::vector<std::vector<GAME_TASK>>& aavTasks_Init,
-		std::vector<std::vector<GAME_TASK>>& aavTasks_Runtime,
-		std::vector<std::vector<GAME_TASK>>& aavTasks_Destroy
-	) : App_Windows(aavTasks_Init, aavTasks_Runtime, aavTasks_Destroy) {}
-	virtual ~App_D3D12() {}
-
-protected:
-
-	/// <summary>
-	/// Init D3D12
-	/// </summary>
-	FUNC_GAME_TASK(GxInit)
-	{
-		OutputDebugStringA("App_D3D12::GxInit");
-		return APP_FORWARD;
-	}
-	/// <summary></summary>
-	FUNC_GAME_TASK(GxRelease)
-	{
-		OutputDebugStringA("App_D3D12::GxRelease");
-		return APP_FORWARD;
-	}
-};
-
 #else
 #error "OS not supported!"
 #endif
-
-/// <summary>
-/// Main Application
-/// </summary>
-class App : protected APP_GfxLib
-{
-public:
-	App() : APP_GfxLib(m_aavTasks_Init, m_aavTasks_Runtime, m_aavTasks_Destroy) 
-	{
-		// .. and execute the app
-		Run();
-	}
-	~App() {}
-
-	FUNC_GAME_TASK(OnInit)
-	{
-		OutputDebugStringA("App::OnInit");
-		return APP_FORWARD;
-	}
-	FUNC_GAME_TASK(OnUpdate)
-	{
-		return APP_FORWARD;
-	}
-	FUNC_GAME_TASK(OnRenderPipeline0)
-	{
-		return APP_FORWARD;
-	}
-	FUNC_GAME_TASK(OnRenderPipeline1)
-	{
-		return APP_FORWARD;
-	}
-	FUNC_GAME_TASK(OnRenderPipeline2)
-	{
-		return APP_FORWARD;
-	}
-	FUNC_GAME_TASK(OnRenderAudio)
-	{
-		return APP_FORWARD;
-	}
-	FUNC_GAME_TASK(OnPostRender)
-	{
-		return APP_FORWARD;
-	}
-	FUNC_GAME_TASK(OnRelease)
-	{
-		OutputDebugStringA("App::OnRelease");
-		return APP_FORWARD;
-	}
-
-	static std::vector<std::vector<GAME_TASK>> m_aavTasks_Init;
-	static std::vector<std::vector<GAME_TASK>> m_aavTasks_Runtime;
-	static std::vector<std::vector<GAME_TASK>> m_aavTasks_Destroy;
-};
-
-/// The concurrent scheme of the App 
-std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Init = { { APP_Os::OsInit }, { APP_GfxLib::GxInit },  { App::OnInit } };
-std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Runtime = {
-	{ App::OnUpdate, APP_Os::OsUpdate }, { APP_Os::OsFrame },
-	{ App::OnRenderPipeline0, App::OnRenderPipeline1, App::OnRenderPipeline2, App::OnRenderAudio },
-	{ App::OnPostRender }
-};
-std::vector<std::vector<GAME_TASK>> App::m_aavTasks_Destroy = { 
-	{ APP_Os::OsPreRelease }, { APP_GfxLib::GxRelease }, { App::OnRelease }, { APP_Os::OsRelease }
-};

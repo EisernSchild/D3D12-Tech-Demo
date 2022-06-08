@@ -11,11 +11,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\app.cpp" />
+    <ClCompile Include="..\..\app_D3D12.cpp" />
+    <ClCompile Include="..\..\app_TechDemo.cpp" />
     <ClCompile Include="..\..\main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\app.h" />
+    <ClInclude Include="..\..\app_D3D12.h" />
+    <ClInclude Include="..\..\app_TechDemo.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

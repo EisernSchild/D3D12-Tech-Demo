@@ -12,7 +12,7 @@
 #error "OS not supported!"
 #endif
 
-#include "app.h"
+#include "app_TechDemo.h"
 
 #ifdef _WIN32
 /// <summary>
@@ -24,7 +24,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 #endif
 {
 	// start Application
-	App cApp;
+	App_TechDemo cApp;
 	return 0;
 }
 

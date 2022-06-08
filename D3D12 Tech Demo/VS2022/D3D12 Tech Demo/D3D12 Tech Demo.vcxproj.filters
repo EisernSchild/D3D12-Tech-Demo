@@ -5,12 +5,28 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="app">
+      <UniqueIdentifier>{9aee8fe4-e6ed-40dc-8092-3ba960facd19}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\app.cpp" />
     <ClCompile Include="..\..\main.cpp" />
+    <ClCompile Include="..\..\app_D3D12.cpp">
+      <Filter>app</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\app_TechDemo.cpp">
+      <Filter>app</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\app.h" />
+    <ClInclude Include="..\..\app.h">
+      <Filter>app</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\app_D3D12.h">
+      <Filter>app</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\app_TechDemo.h">
+      <Filter>app</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
