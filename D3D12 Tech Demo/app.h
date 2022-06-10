@@ -3,13 +3,22 @@
 // 
 // SPDX-License-Identifier: MIT
 
+#ifndef _APP_GENERIC
+#define _APP_GENERIC
+
 #include <stdio.h>
 #include <thread>
 #include <future>
+#include <array>
 
 #ifdef _WIN32
+#ifndef UNICODE
+#define UNICODE
+#endif
+#include <Windows.h>
 #define TRACE_UINT(a) { wchar_t buf[128]; wsprintfW(buf, L"%s:%u:0x%x", L#a, a, a); OutputDebugStringW(buf); }
 #define TRACE_HEX(a) { wchar_t buf[128]; wsprintfW(buf,  L"%s:%x", L#a, a); OutputDebugStringW(buf); }
+#define TRACE_ERROR(a) { wchar_t buf[128]; wsprintfW(buf,  L"Error %s:%x", L#a, a); OutputDebugStringW(buf); }
 #define TRACE_FLOAT(a) { wchar_t buf[128]; swprintf(buf, 128, L"%s:%f", L#a, a); OutputDebugStringW(buf); }
 #define TRACE_CODE { wchar_t buf[128]; wsprintfW(buf, L"(%u) : %s", __LINE__, __FUNCTIONW__); OutputDebugStringW(buf); }
 #define APP_FORWARD S_OK
@@ -23,9 +32,7 @@
 #ifdef _WIN32
 #define GameTimer game_timer
 
-/// <summary>
-/// Game Time simple helper.
-/// </summary>
+/// <summary>Game Time simple helper</summary>
 class game_timer
 {
 public:
@@ -162,6 +169,17 @@ private:
 	/// <summary>True if the timer is stopped.</summary>
 	bool m_bStopped;
 };
+
+/// <summary>Trace error</summary>
+inline signed ThrowIfFailed(HRESULT nHr)
+{
+	if (FAILED(nHr))
+	{
+		TRACE_ERROR(nHr);
+		return APP_ERROR;
+	}
+	return APP_FORWARD;
+}
 
 #else 
 #error "OS not supported!"
@@ -404,7 +422,9 @@ protected:
 
 		RECT sRcDeskt = {};
 		GetClientRect(GetDesktopWindow(), &sRcDeskt);
-		RECT sRect = { 0, 0, sRcDeskt.right >> 1, (sRcDeskt.right >> 5) * 9 };
+		m_sClientSize.nW = sRcDeskt.right >> 1;
+		m_sClientSize.nH = (sRcDeskt.right >> 5) * 9;
+		RECT sRect = { 0, 0, m_sClientSize.nW, m_sClientSize.nH };
 		AdjustWindowRect(&sRect, WS_OVERLAPPEDWINDOW, FALSE);
 
 		// create the window
@@ -494,10 +514,12 @@ protected:
 	}
 
 	static HWND m_pHwnd;
+	static struct Client { int nW, nH; } m_sClientSize;
 
 };
 
-HWND App_Windows::m_pHwnd = nullptr;
 #else
 #error "OS not supported!"
 #endif
+
+#endif // _APP_GENERIC

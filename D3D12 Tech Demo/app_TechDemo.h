@@ -25,11 +25,11 @@ public:
 	}
 	FUNC_GAME_TASK(OnUpdate)
 	{
-		return APP_FORWARD;
+		return APP_GfxLib::UpdateConstants(sInfo);
 	}
 	FUNC_GAME_TASK(OnRenderPipeline0)
 	{
-		return APP_FORWARD;
+		return APP_GfxLib::Draw(sInfo);
 	}
 	FUNC_GAME_TASK(OnRenderPipeline1)
 	{

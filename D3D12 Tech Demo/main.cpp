@@ -3,15 +3,6 @@
 // 
 // SPDX-License-Identifier: MIT
 
-#ifdef _WIN32
-#ifndef UNICODE
-#define UNICODE
-#endif
-#include <windows.h>
-#else 
-#error "OS not supported!"
-#endif
-
 #include "app_TechDemo.h"
 
 #ifdef _WIN32
