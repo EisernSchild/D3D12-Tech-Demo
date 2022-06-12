@@ -19,7 +19,10 @@
     <ClInclude Include="..\..\app.h" />
     <ClInclude Include="..\..\app_D3D12.h" />
     <ClInclude Include="..\..\app_TechDemo.h" />
+    <ClInclude Include="..\..\const_3D.h" />
     <ClInclude Include="..\..\d3dx12.h" />
+    <ClInclude Include="..\..\mesh.h" />
+    <ClInclude Include="..\..\pso.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\LICENSE" />

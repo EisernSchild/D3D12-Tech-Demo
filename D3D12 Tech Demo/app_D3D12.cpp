@@ -7,7 +7,7 @@
 
 HWND App_Windows::m_pHwnd = nullptr;
 App_Windows::Client App_Windows::m_sClientSize;
-App_D3D12::D3D12_Fields App_D3D12::m_sFields;
+App_D3D12::D3D12_Fields App_D3D12::m_sD3D;
 
 signed App_D3D12::GxInit(AppData& sInfo)
 {
@@ -36,20 +36,20 @@ signed App_D3D12::InitDirect3D()
 
 	// create DXGI factory, hardware device and fence
 	ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(&psDxgiFactory)));
-	ThrowIfFailed(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_sFields.pcDevice)));
-	ThrowIfFailed(m_sFields.pcDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_sFields.psFence)));
+	ThrowIfFailed(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_sD3D.pcDevice)));
+	ThrowIfFailed(m_sD3D.pcDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_sD3D.psFence)));
 
 	// get descriptor sizes
-	m_sFields.uRtvDcSz = m_sFields.pcDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	m_sFields.uDsvDcSz = m_sFields.pcDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-	m_sFields.uCbvSrvUavDcSz = m_sFields.pcDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_sD3D.uRtvDcSz = m_sD3D.pcDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_sD3D.uDsvDcSz = m_sD3D.pcDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	m_sD3D.uCbvSrvUavDcSz = m_sD3D.pcDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// set MSAA quality
 	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS sLevels = {
-		m_sFields.eBackbufferFmt, 4, D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE, 0 };
-	ThrowIfFailed(m_sFields.pcDevice->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &sLevels, sizeof(sLevels)));
-	m_sFields.u4xMsaaQuality = sLevels.NumQualityLevels;
-	assert(m_sFields.u4xMsaaQuality > 0 && "Unexpected MSAA quality level.");
+		m_sD3D.eBackbufferFmt, 4, D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE, 0 };
+	ThrowIfFailed(m_sD3D.pcDevice->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &sLevels, sizeof(sLevels)));
+	m_sD3D.u4xMsaaQuality = sLevels.NumQualityLevels;
+	assert(m_sD3D.u4xMsaaQuality > 0 && "Unexpected MSAA quality level.");
 
 	// create
 	CreateCommandObjects();
@@ -58,7 +58,7 @@ signed App_D3D12::InitDirect3D()
 
 	// resize and reset to prepare for initialization
 	OnResize();
-	ThrowIfFailed(m_sFields.psCmdList->Reset(m_sFields.psCmdListAlloc.Get(), nullptr));
+	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), nullptr));
 
 	// build d3d tools and resources
 	BuildDescriptorHeaps();
@@ -68,9 +68,9 @@ signed App_D3D12::InitDirect3D()
 	BuildGeometry();
 
 	// execute initialization
-	ThrowIfFailed(m_sFields.psCmdList->Close());
-	ID3D12CommandList* cmdsLists[] = { m_sFields.psCmdList.Get() };
-	m_sFields.psCmdQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+	ThrowIfFailed(m_sD3D.psCmdList->Close());
+	ID3D12CommandList* cmdsLists[] = { m_sD3D.psCmdList.Get() };
+	m_sD3D.psCmdQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	// ...and sync
 	FlushCommandQueue();
@@ -82,23 +82,23 @@ signed App_D3D12::CreateCommandObjects()
 {
 	// queue
 	D3D12_COMMAND_QUEUE_DESC sQueueDc = { D3D12_COMMAND_LIST_TYPE_DIRECT, 0, D3D12_COMMAND_QUEUE_FLAG_NONE, 0 };
-	ThrowIfFailed(m_sFields.pcDevice->CreateCommandQueue(&sQueueDc, IID_PPV_ARGS(&m_sFields.psCmdQueue)));
+	ThrowIfFailed(m_sD3D.pcDevice->CreateCommandQueue(&sQueueDc, IID_PPV_ARGS(&m_sD3D.psCmdQueue)));
 
 	// allocator
-	ThrowIfFailed(m_sFields.pcDevice->CreateCommandAllocator(
+	ThrowIfFailed(m_sD3D.pcDevice->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		IID_PPV_ARGS(m_sFields.psCmdListAlloc.GetAddressOf())));
+		IID_PPV_ARGS(m_sD3D.psCmdListAlloc.GetAddressOf())));
 
 	// list 
-	ThrowIfFailed(m_sFields.pcDevice->CreateCommandList(
+	ThrowIfFailed(m_sD3D.pcDevice->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		m_sFields.psCmdListAlloc.Get(),
+		m_sD3D.psCmdListAlloc.Get(),
 		nullptr,
-		IID_PPV_ARGS(m_sFields.psCmdList.GetAddressOf())));
+		IID_PPV_ARGS(m_sD3D.psCmdList.GetAddressOf())));
 
 	// start closed
-	m_sFields.psCmdList->Close();
+	m_sD3D.psCmdList->Close();
 
 	return APP_FORWARD;
 }
@@ -106,18 +106,18 @@ signed App_D3D12::CreateCommandObjects()
 signed App_D3D12::CreateSwapChain(IDXGIFactory4* pcFactory)
 {
 	// release previous
-	m_sFields.psSwapchain.Reset();
+	m_sD3D.psSwapchain.Reset();
 
 	DXGI_SWAP_CHAIN_DESC sSCDc = {};
 	sSCDc.BufferDesc.Width = (UINT)m_sClientSize.nW;
 	sSCDc.BufferDesc.Height = (UINT)m_sClientSize.nH;
 	sSCDc.BufferDesc.RefreshRate.Numerator = 60;
 	sSCDc.BufferDesc.RefreshRate.Denominator = 1;
-	sSCDc.BufferDesc.Format = m_sFields.eBackbufferFmt;
+	sSCDc.BufferDesc.Format = m_sD3D.eBackbufferFmt;
 	sSCDc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 	sSCDc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-	sSCDc.SampleDesc.Count = m_sFields.b4xMsaaState ? 4 : 1;
-	sSCDc.SampleDesc.Quality = m_sFields.b4xMsaaState ? (m_sFields.u4xMsaaQuality - 1) : 0;
+	sSCDc.SampleDesc.Count = m_sD3D.b4xMsaaState ? 4 : 1;
+	sSCDc.SampleDesc.Quality = m_sD3D.b4xMsaaState ? (m_sD3D.u4xMsaaQuality - 1) : 0;
 	sSCDc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sSCDc.BufferCount = nSwapchainBufferN;
 	sSCDc.OutputWindow = m_pHwnd;
@@ -126,9 +126,9 @@ signed App_D3D12::CreateSwapChain(IDXGIFactory4* pcFactory)
 	sSCDc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 
 	ThrowIfFailed(pcFactory->CreateSwapChain(
-		m_sFields.psCmdQueue.Get(),
+		m_sD3D.psCmdQueue.Get(),
 		&sSCDc,
-		m_sFields.psSwapchain.GetAddressOf()));
+		m_sD3D.psSwapchain.GetAddressOf()));
 
 	return APP_FORWARD;
 }
@@ -136,18 +136,18 @@ signed App_D3D12::CreateSwapChain(IDXGIFactory4* pcFactory)
 signed App_D3D12::FlushCommandQueue()
 {
 	// inc fence value
-	m_sFields.uFenceCnt++;
+	m_sD3D.uFenceCnt++;
 
 	// send signal
-	ThrowIfFailed(m_sFields.psCmdQueue->Signal(m_sFields.psFence.Get(), m_sFields.uFenceCnt));
+	ThrowIfFailed(m_sD3D.psCmdQueue->Signal(m_sD3D.psFence.Get(), m_sD3D.uFenceCnt));
 
-	if (m_sFields.psFence->GetCompletedValue() < m_sFields.uFenceCnt)
+	if (m_sD3D.psFence->GetCompletedValue() < m_sD3D.uFenceCnt)
 	{
 		HANDLE eventHandle = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		if (eventHandle == nullptr) { ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError())); }
 
 		// fire event and wait for GPU
-		ThrowIfFailed(m_sFields.psFence->SetEventOnCompletion(m_sFields.uFenceCnt, eventHandle));
+		ThrowIfFailed(m_sD3D.psFence->SetEventOnCompletion(m_sD3D.uFenceCnt, eventHandle));
 		WaitForSingleObject(eventHandle, INFINITE);
 		CloseHandle(eventHandle);
 	}
@@ -158,44 +158,44 @@ signed App_D3D12::FlushCommandQueue()
 signed App_D3D12::CreateDHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC sHeapRtvDc = { D3D12_DESCRIPTOR_HEAP_TYPE_RTV, nSwapchainBufferN, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0 };
-	ThrowIfFailed(m_sFields.pcDevice->CreateDescriptorHeap(&sHeapRtvDc, IID_PPV_ARGS(m_sFields.psHeapRtv.GetAddressOf())));
+	ThrowIfFailed(m_sD3D.pcDevice->CreateDescriptorHeap(&sHeapRtvDc, IID_PPV_ARGS(m_sD3D.psHeapRtv.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC sHeapDsvDc = { D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, D3D12_DESCRIPTOR_HEAP_FLAG_NONE, 0 };
-	ThrowIfFailed(m_sFields.pcDevice->CreateDescriptorHeap( &sHeapDsvDc, IID_PPV_ARGS(m_sFields.psHeapDsv.GetAddressOf())));
-	
+	ThrowIfFailed(m_sD3D.pcDevice->CreateDescriptorHeap(&sHeapDsvDc, IID_PPV_ARGS(m_sD3D.psHeapDsv.GetAddressOf())));
+
 	return APP_FORWARD;
 }
 
 signed App_D3D12::OnResize()
 {
-	assert(m_sFields.pcDevice);
-	assert(m_sFields.psSwapchain);
-	assert(m_sFields.psCmdListAlloc);
+	assert(m_sD3D.pcDevice);
+	assert(m_sD3D.psSwapchain);
+	assert(m_sD3D.psCmdListAlloc);
 
 	// flush and reset
 	FlushCommandQueue();
-	ThrowIfFailed(m_sFields.psCmdList->Reset(m_sFields.psCmdListAlloc.Get(), nullptr));
+	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), nullptr));
 
 	// release previous
 	for (int i = 0; i < nSwapchainBufferN; ++i)
-		m_sFields.apsBufferSC[i].Reset();
-	m_sFields.psBufferDS.Reset();
+		m_sD3D.apsBufferSC[i].Reset();
+	m_sD3D.psBufferDS.Reset();
 
 	// resize swapchain, set index to zero
-	ThrowIfFailed(m_sFields.psSwapchain->ResizeBuffers(
+	ThrowIfFailed(m_sD3D.psSwapchain->ResizeBuffers(
 		nSwapchainBufferN,
 		(UINT)m_sClientSize.nW, (UINT)m_sClientSize.nH,
-		m_sFields.eBackbufferFmt,
+		m_sD3D.eBackbufferFmt,
 		DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH));
-	m_sFields.nBackbufferI = 0;
+	m_sD3D.nBackbufferI = 0;
 
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE sRtvHeapHandle(m_sFields.psHeapRtv->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE sRtvHeapHandle(m_sD3D.psHeapRtv->GetCPUDescriptorHandleForHeapStart());
 	for (UINT uI = 0; uI < (UINT)nSwapchainBufferN; uI++)
 	{
-		ThrowIfFailed(m_sFields.psSwapchain->GetBuffer(uI, IID_PPV_ARGS(&m_sFields.apsBufferSC[uI])));
-		m_sFields.pcDevice->CreateRenderTargetView(m_sFields.apsBufferSC[uI].Get(), nullptr, sRtvHeapHandle);
-		sRtvHeapHandle.Offset(1, m_sFields.uRtvDcSz);
+		ThrowIfFailed(m_sD3D.psSwapchain->GetBuffer(uI, IID_PPV_ARGS(&m_sD3D.apsBufferSC[uI])));
+		m_sD3D.pcDevice->CreateRenderTargetView(m_sD3D.apsBufferSC[uI].Get(), nullptr, sRtvHeapHandle);
+		sRtvHeapHandle.Offset(1, m_sD3D.uRtvDcSz);
 	}
 
 	// create the depthstencil buffer and view
@@ -206,45 +206,44 @@ signed App_D3D12::OnResize()
 	sDepthstencilDc.Height = (UINT)m_sClientSize.nH;
 	sDepthstencilDc.DepthOrArraySize = 1;
 	sDepthstencilDc.MipLevels = 1;
-	sDepthstencilDc.Format = m_sFields.eDepthstencilFmt;
-	sDepthstencilDc.SampleDesc.Count = m_sFields.b4xMsaaState ? 4 : 1;
-	sDepthstencilDc.SampleDesc.Quality = m_sFields.b4xMsaaState ? (m_sFields.u4xMsaaQuality - 1) : 0;
+	sDepthstencilDc.Format = m_sD3D.eDepthstencilFmt;
+	sDepthstencilDc.SampleDesc.Count = m_sD3D.b4xMsaaState ? 4 : 1;
+	sDepthstencilDc.SampleDesc.Quality = m_sD3D.b4xMsaaState ? (m_sD3D.u4xMsaaQuality - 1) : 0;
 	sDepthstencilDc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	sDepthstencilDc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
-	D3D12_CLEAR_VALUE sClear = { m_sFields.eDepthstencilFmt, { 1.0f, 0 } };
+	D3D12_CLEAR_VALUE sClear = { m_sD3D.eDepthstencilFmt, { 1.0f, 0 } };
 	const CD3DX12_HEAP_PROPERTIES sPrps(D3D12_HEAP_TYPE_DEFAULT);
-	ThrowIfFailed(m_sFields.pcDevice->CreateCommittedResource(
+	ThrowIfFailed(m_sD3D.pcDevice->CreateCommittedResource(
 		&sPrps,
 		D3D12_HEAP_FLAG_NONE,
 		&sDepthstencilDc,
 		D3D12_RESOURCE_STATE_COMMON,
 		&sClear,
-		IID_PPV_ARGS(m_sFields.psBufferDS.GetAddressOf())));
+		IID_PPV_ARGS(m_sD3D.psBufferDS.GetAddressOf())));
 
-	m_sFields.pcDevice->CreateDepthStencilView(m_sFields.psBufferDS.Get(), nullptr, m_sFields.psHeapDsv->GetCPUDescriptorHandleForHeapStart());
+	m_sD3D.pcDevice->CreateDepthStencilView(m_sD3D.psBufferDS.Get(), nullptr, m_sD3D.psHeapDsv->GetCPUDescriptorHandleForHeapStart());
 
 	// transit the resource to be used as a depth buffer
-	const CD3DX12_RESOURCE_BARRIER sResBr = CD3DX12_RESOURCE_BARRIER::Transition(m_sFields.psBufferDS.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-	m_sFields.psCmdList->ResourceBarrier(1, &sResBr);
+	const CD3DX12_RB_TRANSITION sResBr(m_sD3D.psBufferDS.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+	m_sD3D.psCmdList->ResourceBarrier(1, &sResBr);
 
 	// ... and execute
-	ThrowIfFailed(m_sFields.psCmdList->Close());
-	ID3D12CommandList* cmdsLists[] = { m_sFields.psCmdList.Get() };
-	m_sFields.psCmdQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+	ThrowIfFailed(m_sD3D.psCmdList->Close());
+	ID3D12CommandList* cmdsLists[] = { m_sD3D.psCmdList.Get() };
+	m_sD3D.psCmdQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	// ..and sync
 	FlushCommandQueue();
 
 	// update viewport and scissor rectangle
-	m_sFields.sScreenVp.TopLeftX = 0;
-	m_sFields.sScreenVp.TopLeftY = 0;
-	m_sFields.sScreenVp.Width = static_cast<float>(m_sClientSize.nW);
-	m_sFields.sScreenVp.Height = static_cast<float>(m_sClientSize.nH);
-	m_sFields.sScreenVp.MinDepth = 0.0f;
-	m_sFields.sScreenVp.MaxDepth = 1.0f;
-	m_sFields.sScissorRc = { 0, 0, (long)m_sClientSize.nW, (long)m_sClientSize.nH };
+	m_sD3D.sScreenVp.TopLeftX = 0;
+	m_sD3D.sScreenVp.TopLeftY = 0;
+	m_sD3D.sScreenVp.Width = static_cast<float>(m_sClientSize.nW);
+	m_sD3D.sScreenVp.Height = static_cast<float>(m_sClientSize.nH);
+	m_sD3D.sScreenVp.MinDepth = 0.0f;
+	m_sD3D.sScreenVp.MaxDepth = 1.0f;
+	m_sD3D.sScissorRc = { 0, 0, (long)m_sClientSize.nW, (long)m_sClientSize.nH };
 
 	return APP_FORWARD;
 }
@@ -284,9 +283,9 @@ signed App_D3D12::UpdateConstants(const AppData& gt)
 	XMStoreFloat4x4(&sConstants.sWVP, XMMatrixTranspose(worldViewProj));
 
 	BYTE* ptData = nullptr;
-	ThrowIfFailed(m_sFields.psBufferUp->Map(0, nullptr, reinterpret_cast<void**>(&ptData)));
+	ThrowIfFailed(m_sD3D.psBufferUp->Map(0, nullptr, reinterpret_cast<void**>(&ptData)));
 	memcpy(&ptData[0], &sConstants, sizeof(ConstantsWVP));
-	if (m_sFields.psBufferUp != nullptr) m_sFields.psBufferUp->Unmap(0, nullptr);
+	if (m_sD3D.psBufferUp != nullptr) m_sD3D.psBufferUp->Unmap(0, nullptr);
 
 	return APP_FORWARD;
 }
@@ -294,60 +293,58 @@ signed App_D3D12::UpdateConstants(const AppData& gt)
 signed App_D3D12::Draw(const AppData& gt)
 {
 	// reset
-	ThrowIfFailed(m_sFields.psCmdListAlloc->Reset());
-	ThrowIfFailed(m_sFields.psCmdList->Reset(m_sFields.psCmdListAlloc.Get(), m_sFields.psPSO.Get()));
+	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
+	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), m_sD3D.psPSOx->Get()));
 
 	// trans
-	const CD3DX12_RESOURCE_BARRIER sResBr0 = CD3DX12_RESOURCE_BARRIER::Transition(m_sFields.apsBufferSC[m_sFields.nBackbufferI].Get(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	m_sFields.psCmdList->ResourceBarrier(1, &sResBr0);
+	const CD3DX12_RB_TRANSITION sResBr0(m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	m_sD3D.psCmdList->ResourceBarrier(1, &sResBr0);
 
 	// viewport, scissor rect
-	m_sFields.psCmdList->RSSetViewports(1, &m_sFields.sScreenVp);
-	m_sFields.psCmdList->RSSetScissorRects(1, &m_sFields.sScissorRc);
+	m_sD3D.psCmdList->RSSetViewports(1, &m_sD3D.sScreenVp);
+	m_sD3D.psCmdList->RSSetScissorRects(1, &m_sD3D.sScissorRc);
 
 	// clear
 	const float afColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	m_sFields.psCmdList->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(
-		m_sFields.psHeapRtv->GetCPUDescriptorHandleForHeapStart(),
-		m_sFields.nBackbufferI,
-		m_sFields.uRtvDcSz), afColor, 0, nullptr);
-	m_sFields.psCmdList->ClearDepthStencilView(m_sFields.psHeapDsv->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	m_sD3D.psCmdList->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(
+		m_sD3D.psHeapRtv->GetCPUDescriptorHandleForHeapStart(),
+		m_sD3D.nBackbufferI,
+		m_sD3D.uRtvDcSz), afColor, 0, nullptr);
+	m_sD3D.psCmdList->ClearDepthStencilView(m_sD3D.psHeapDsv->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	// set render targets
-	CD3DX12_CPU_DESCRIPTOR_HANDLE sRtvHandle(m_sFields.psHeapRtv->GetCPUDescriptorHandleForHeapStart(),
-		m_sFields.nBackbufferI,
-		m_sFields.uRtvDcSz);
-	D3D12_CPU_DESCRIPTOR_HANDLE sDsvHandle = m_sFields.psHeapDsv->GetCPUDescriptorHandleForHeapStart();
-	m_sFields.psCmdList->OMSetRenderTargets(1, &sRtvHandle, true, &sDsvHandle);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE sRtvHandle(m_sD3D.psHeapRtv->GetCPUDescriptorHandleForHeapStart(),
+		m_sD3D.nBackbufferI,
+		m_sD3D.uRtvDcSz);
+	D3D12_CPU_DESCRIPTOR_HANDLE sDsvHandle = m_sD3D.psHeapDsv->GetCPUDescriptorHandleForHeapStart();
+	m_sD3D.psCmdList->OMSetRenderTargets(1, &sRtvHandle, true, &sDsvHandle);
 
 	// descriptor heaps, root signature
-	ID3D12DescriptorHeap* apsDHeaps[] = { m_sFields.psCbvHeap.Get() };
-	m_sFields.psCmdList->SetDescriptorHeaps(_countof(apsDHeaps), apsDHeaps);
-	m_sFields.psCmdList->SetGraphicsRootSignature(m_sFields.psRootSign.Get());
+	ID3D12DescriptorHeap* apsDHeaps[] = { m_sD3D.psCbvHeap.Get() };
+	m_sD3D.psCmdList->SetDescriptorHeaps(_countof(apsDHeaps), apsDHeaps);
+	m_sD3D.psCmdList->SetGraphicsRootSignature(m_sD3D.psRootSign.Get());
 
 	// vertex, index buffer - topology,... and draw
-	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sFields.pcMeshBox->ViewV();
-	D3D12_INDEX_BUFFER_VIEW sIBV = m_sFields.pcMeshBox->ViewI();
-	m_sFields.psCmdList->IASetVertexBuffers(0, 1, &sVBV);
-	m_sFields.psCmdList->IASetIndexBuffer(&sIBV);
-	m_sFields.psCmdList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_sFields.psCmdList->SetGraphicsRootDescriptorTable(0, m_sFields.psCbvHeap->GetGPUDescriptorHandleForHeapStart());
-	m_sFields.psCmdList->DrawIndexedInstanced(m_sFields.pcMeshBox->m_uIdcN, 1, 0, 0, 0);
+	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcMeshBox->ViewV();
+	D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcMeshBox->ViewI();
+	m_sD3D.psCmdList->IASetVertexBuffers(0, 1, &sVBV);
+	m_sD3D.psCmdList->IASetIndexBuffer(&sIBV);
+	m_sD3D.psCmdList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(0, m_sD3D.psCbvHeap->GetGPUDescriptorHandleForHeapStart());
+	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcMeshBox->Indices_N(), 1, 0, 0, 0);
 
 	// transit
-	const CD3DX12_RESOURCE_BARRIER sResBr1 = CD3DX12_RESOURCE_BARRIER::Transition(m_sFields.apsBufferSC[m_sFields.nBackbufferI].Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-	m_sFields.psCmdList->ResourceBarrier(1, &sResBr1);
+	const CD3DX12_RB_TRANSITION sResBr1(m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	m_sD3D.psCmdList->ResourceBarrier(1, &sResBr1);
 
 	// close list and execute
-	ThrowIfFailed(m_sFields.psCmdList->Close());
-	ID3D12CommandList* cmdsLists[] = { m_sFields.psCmdList.Get() };
-	m_sFields.psCmdQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+	ThrowIfFailed(m_sD3D.psCmdList->Close());
+	ID3D12CommandList* cmdsLists[] = { m_sD3D.psCmdList.Get() };
+	m_sD3D.psCmdQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	// present and swap
-	ThrowIfFailed(m_sFields.psSwapchain->Present(0, 0));
-	m_sFields.nBackbufferI = (m_sFields.nBackbufferI + 1) % nSwapchainBufferN;
+	ThrowIfFailed(m_sD3D.psSwapchain->Present(0, 0));
+	m_sD3D.nBackbufferI = (m_sD3D.nBackbufferI + 1) % nSwapchainBufferN;
 
 	// wait
 	FlushCommandQueue();
@@ -362,8 +359,8 @@ signed App_D3D12::BuildDescriptorHeaps()
 	sCbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	sCbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	sCbvHeapDesc.NodeMask = 0;
-	ThrowIfFailed(m_sFields.pcDevice->CreateDescriptorHeap(&sCbvHeapDesc,
-		IID_PPV_ARGS(&m_sFields.psCbvHeap)));
+	ThrowIfFailed(m_sD3D.pcDevice->CreateDescriptorHeap(&sCbvHeapDesc,
+		IID_PPV_ARGS(&m_sD3D.psCbvHeap)));
 
 	return APP_FORWARD;
 }
@@ -372,18 +369,18 @@ signed App_D3D12::BuildConstantBuffers()
 {
 	const CD3DX12_HEAP_PROPERTIES sPrpsU(D3D12_HEAP_TYPE_UPLOAD);
 	const CD3DX12_RESOURCE_DESC sDesc = CD3DX12_RESOURCE_DESC::Buffer(Align8Bit(sizeof(ConstantsWVP)) * 1);
-	
+
 	// create buffer
-	ThrowIfFailed(m_sFields.pcDevice->CreateCommittedResource(
+	ThrowIfFailed(m_sD3D.pcDevice->CreateCommittedResource(
 		&sPrpsU,
 		D3D12_HEAP_FLAG_NONE,
 		&sDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&m_sFields.psBufferUp)));
+		IID_PPV_ARGS(&m_sD3D.psBufferUp)));
 
 	// get address and align
-	D3D12_GPU_VIRTUAL_ADDRESS uAddress = m_sFields.psBufferUp->GetGPUVirtualAddress();
+	D3D12_GPU_VIRTUAL_ADDRESS uAddress = m_sD3D.psBufferUp->GetGPUVirtualAddress();
 	int uCBIx = 0;
 	uAddress += uCBIx * Align8Bit(sizeof(ConstantsWVP));
 
@@ -391,7 +388,7 @@ signed App_D3D12::BuildConstantBuffers()
 	D3D12_CONSTANT_BUFFER_VIEW_DESC sCbvDesc;
 	sCbvDesc.BufferLocation = uAddress;
 	sCbvDesc.SizeInBytes = Align8Bit(sizeof(ConstantsWVP));
-	m_sFields.pcDevice->CreateConstantBufferView(&sCbvDesc, m_sFields.psCbvHeap->GetCPUDescriptorHandleForHeapStart());
+	m_sD3D.pcDevice->CreateConstantBufferView(&sCbvDesc, m_sD3D.psCbvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	return APP_FORWARD;
 }
@@ -413,19 +410,19 @@ signed App_D3D12::BuildRootSignature()
 	ThrowIfFailed(nHr);
 
 	// and create
-	ThrowIfFailed(m_sFields.pcDevice->CreateRootSignature(
+	ThrowIfFailed(m_sD3D.pcDevice->CreateRootSignature(
 		0,
 		sRootSig->GetBufferPointer(),
 		sRootSig->GetBufferSize(),
-		IID_PPV_ARGS(&m_sFields.psRootSign)));
+		IID_PPV_ARGS(&m_sD3D.psRootSign)));
 
 	return APP_FORWARD;
 }
 
 signed App_D3D12::BuildShaders()
 {
-	HRESULT hr = S_OK;
-	ComPtr<ID3DBlob> sMvsByteCode = nullptr, sMpsByteCode = nullptr;
+	HRESULT nHr = S_OK;
+	ComPtr<ID3DBlob> sMvsByteCode = nullptr, sMpsByteCode = nullptr, sNullBlob = nullptr;
 	std::vector<D3D12_INPUT_ELEMENT_DESC> asLayout;
 
 	D3D_SHADER_MACRO sMacro = {};
@@ -438,30 +435,18 @@ signed App_D3D12::BuildShaders()
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC sPsoDc = {};
-	sPsoDc.InputLayout = { asLayout.data(), (UINT)asLayout.size() };
-	sPsoDc.pRootSignature = m_sFields.psRootSign.Get();
-	sPsoDc.VS =
-	{
-		reinterpret_cast<BYTE*>(sMvsByteCode->GetBufferPointer()),
-		sMvsByteCode->GetBufferSize()
-	};
-	sPsoDc.PS =
-	{
-		reinterpret_cast<BYTE*>(sMpsByteCode->GetBufferPointer()),
-		sMpsByteCode->GetBufferSize()
-	};
-	sPsoDc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	sPsoDc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	sPsoDc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-	sPsoDc.SampleMask = UINT_MAX;
-	sPsoDc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	sPsoDc.NumRenderTargets = 1;
-	sPsoDc.RTVFormats[0] = m_sFields.eBackbufferFmt;
-	sPsoDc.SampleDesc.Count = m_sFields.b4xMsaaState ? 4 : 1;
-	sPsoDc.SampleDesc.Quality = m_sFields.b4xMsaaState ? (m_sFields.u4xMsaaQuality - 1) : 0;
-	sPsoDc.DSVFormat = m_sFields.eDepthstencilFmt;
-	ThrowIfFailed(m_sFields.pcDevice->CreateGraphicsPipelineState(&sPsoDc, IID_PPV_ARGS(&m_sFields.psPSO)));
+	m_sD3D.psPSOx = std::make_shared<D3D12_PSO>(
+		m_sD3D.pcDevice,
+		nHr,
+		m_sD3D.psRootSign,
+		sMvsByteCode,
+		sMpsByteCode,
+		sNullBlob,
+		sNullBlob,
+		sNullBlob,
+		asLayout
+		);
+	ThrowIfFailed(nHr);
 
 	return APP_FORWARD;
 }
@@ -507,7 +492,7 @@ signed App_D3D12::BuildGeometry()
 		4, 3, 7
 	};
 
-	m_sFields.pcMeshBox = std::make_unique<Mesh<VertexPosCol>>(m_sFields.pcDevice.Get(), m_sFields.psCmdList.Get(), asVertices, auIndices, "box");
+	m_sD3D.pcMeshBox = std::make_unique<Mesh_PosCol>(m_sD3D.pcDevice.Get(), m_sD3D.psCmdList.Get(), asVertices, auIndices, "box");
 
 	return APP_FORWARD;
 }
