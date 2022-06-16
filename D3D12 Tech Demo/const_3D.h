@@ -34,13 +34,20 @@ struct VertexPosCol
 };
 
 /// <summary>Simple Sample constants</summary>
-struct ConstantsWVP
+struct ConstantsScene
 {
+	/// <summary>world view projection</summary>
 	XMFLOAT4X4 sWVP = XMFLOAT4X4(
 		1.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f);
+	/// <summary>time (x - total, y - delta, z - fps total, w - fps)</summary>
+	XMFLOAT4 sTime;
+	/// <summary>viewport (x - topLeftX, y - topLeftY, z - width, w - height)</summary>
+	XMFLOAT4 sViewport;
+	/// <summary>mouse (x - x position, y - y position, z - buttons (unsigned), w - wheel (unsigned)</summary>
+	XMFLOAT4 sMouse;
 };
 
 /// <summary>round up to nearest multiple of 256</summary>
@@ -50,19 +57,66 @@ inline unsigned Align8Bit(unsigned uSize) { return (uSize + 255) & ~255; }
 struct CD3DX12_RB_TRANSITION : public D3D12_RESOURCE_BARRIER
 {
 	explicit CD3DX12_RB_TRANSITION(
-		_In_ ID3D12Resource* pResource,
-		D3D12_RESOURCE_STATES stateBefore,
-		D3D12_RESOURCE_STATES stateAfter,
-		UINT subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-		D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
+		ID3D12Resource* psResource,
+		D3D12_RESOURCE_STATES eStatePrev,
+		D3D12_RESOURCE_STATES eStatePost,
+		UINT uSub = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+		D3D12_RESOURCE_BARRIER_FLAGS eFlags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
 	{
 		this->Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		this->Flags = flags;
-		this->Transition.pResource = pResource;
-		this->Transition.StateBefore = stateBefore;
-		this->Transition.StateAfter = stateAfter;
-		this->Transition.Subresource = subresource;
+		this->Flags = eFlags;
+		this->Transition.pResource = psResource;
+		this->Transition.StateBefore = eStatePrev;
+		this->Transition.StateAfter = eStatePost;
+		this->Transition.Subresource = uSub;
 	}
+
+	/// <summary>execute transit</summary>
+	static inline void ResourceBarrier(
+		ID3D12GraphicsCommandList* psCmdList,
+		ID3D12Resource* psResource,
+		D3D12_RESOURCE_STATES eStatePrev,
+		D3D12_RESOURCE_STATES eStatePost,
+		UINT uSub = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+		D3D12_RESOURCE_BARRIER_FLAGS eFlags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
+	{
+		const D3D12_RESOURCE_BARRIER sDc = {
+			D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+			eFlags,
+			{
+				psResource,
+				uSub,
+				eStatePrev,
+				eStatePost
+			}
+		};
+		psCmdList->ResourceBarrier(1, &sDc);
+	}
+};
+
+/// <summary>sampler types enumeration</summary>
+enum struct SamplerTypes : unsigned
+{
+	MinMagMipPointUVWClamp
+};
+/// <summary>number of samplers contained in s_asSamplerDcs</summary>
+constexpr unsigned s_uSamplerN = 1;
+
+const D3D12_SAMPLER_DESC s_asSamplerDcs[s_uSamplerN] =
+{
+	// MinMagMipPointUVWClamp
+	{
+		D3D12_FILTER_MIN_MAG_MIP_POINT,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+		D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+		0.0F,
+		0,
+		D3D12_COMPARISON_FUNC_ALWAYS,
+		{ 0.0F, 0.0F, 0.0F, 0.0F },
+		0.0F,
+		D3D12_FLOAT32_MAX
+	},
 };
 
 #endif

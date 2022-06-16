@@ -14,6 +14,9 @@
     <Filter Include="pipeline">
       <UniqueIdentifier>{dfda067c-ed52-47dc-b9a5-ef6a551ae07b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shader">
+      <UniqueIdentifier>{beab90b0-9c76-446a-b534-e45a18d94301}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\main.cpp" />
@@ -50,5 +53,16 @@
   <ItemGroup>
     <None Include="..\..\..\LICENSE" />
     <None Include="..\..\..\README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\Shaders\PS_phong.hlsl">
+      <Filter>shader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\VS_phong.hlsl">
+      <Filter>shader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\CS_post.hlsl">
+      <Filter>shader</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

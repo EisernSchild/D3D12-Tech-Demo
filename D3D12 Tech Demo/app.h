@@ -200,8 +200,8 @@ struct AppData
 	float fFPS;
 };
 
-#define FUNC_GAME_TASK(task) static signed task(AppData& sInfo)
-typedef signed(*GAME_TASK)(AppData& sInfo);
+#define FUNC_GAME_TASK(task) static signed task(AppData& sData)
+typedef signed(*GAME_TASK)(AppData& sData);
 
 /// <summary>
 /// App Basics Parent Class.
@@ -439,7 +439,7 @@ protected:
 			nullptr,
 			nullptr,
 			pHInstance,
-			&sInfo);
+			&sData);
 
 		// show the window
 		ShowWindow(m_pHwnd, SW_SHOW);

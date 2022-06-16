@@ -41,3 +41,6 @@
 *.pdb
 /D3D12 Tech Demo/VS2022/D3D12 Tech Demo/x64/Debug
 *.user
+/D3D12 Tech Demo/VS2022/x64/Debug/CS_post.cso
+/D3D12 Tech Demo/VS2022/x64/Debug/PS_phong.cso
+/D3D12 Tech Demo/VS2022/x64/Debug/VS_phong.cso

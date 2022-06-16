@@ -13,8 +13,8 @@ class Mesh
 {
 #ifdef GfxLib_D3D12
 public:
-	Mesh(ID3D12Device* pcDevice,
-		ID3D12GraphicsCommandList* pcCmdList,
+	Mesh(ID3D12Device* psDevice,
+		ID3D12GraphicsCommandList* psCmdList,
 		std::string atName = "mesh")
 		: m_uStrideV(sizeof(T))
 		, m_eFormatI(DXGI_FORMAT_R16_UINT)
@@ -62,12 +62,12 @@ private:
 class Mesh_PosCol : public Mesh<VertexPosCol>
 {
 public:
-	Mesh_PosCol(ID3D12Device* pcDevice,
-		ID3D12GraphicsCommandList* pcCmdList,
+	Mesh_PosCol(ID3D12Device* psDevice,
+		ID3D12GraphicsCommandList* psCmdList,
 		std::vector<VertexPosCol> asVtc,
 		std::vector<std::uint16_t> auIdc,
 		std::string atName = "mesh")
-		: Mesh<VertexPosCol>(pcDevice, pcCmdList, atName)
+		: Mesh<VertexPosCol>(psDevice, psCmdList, atName)
 	{
 		m_uSizeV = (UINT)asVtc.size() * sizeof(VertexPosCol);
 		m_uSizeI = (UINT)auIdc.size() * sizeof(std::uint16_t);
@@ -79,19 +79,19 @@ public:
 		ThrowIfFailed(D3DCreateBlob(m_uSizeI, &m_psBlobIB));
 		CopyMemory(m_psBlobIB->GetBufferPointer(), auIdc.data(), m_uSizeI);
 
-		Create(pcDevice, pcCmdList, asVtc, auIdc);
+		Create(psDevice, psCmdList, asVtc, auIdc);
 	}
 
 private:
-	signed Create(ID3D12Device* pcDevice,
-		ID3D12GraphicsCommandList* pcCmdList,
+	signed Create(ID3D12Device* psDevice,
+		ID3D12GraphicsCommandList* psCmdList,
 		std::vector<VertexPosCol> asVtc,
 		std::vector<std::uint16_t> auIdc)
 	{
 		// create buffers and upload buffers
-		ThrowIfFailed(Create(pcDevice, pcCmdList, asVtc.data(),
+		ThrowIfFailed(Create(psDevice, psCmdList, asVtc.data(),
 			m_uSizeV, m_pcBufferV, m_pcBufferTmpV));
-		ThrowIfFailed(Create(pcDevice, pcCmdList, auIdc.data(),
+		ThrowIfFailed(Create(psDevice, psCmdList, auIdc.data(),
 			m_uSizeI, m_pcBufferI, m_pcBufferTmpI));
 
 		return APP_FORWARD;
@@ -99,8 +99,8 @@ private:
 
 	/// <summary>create buffer and upload buffer, schedule to copy data</summary>
 	signed Create(
-		ID3D12Device* pcDevice,
-		ID3D12GraphicsCommandList* pcCmdList,
+		ID3D12Device* psDevice,
+		ID3D12GraphicsCommandList* psCmdList,
 		const void* pvInitData,
 		UINT64 uBytesize,
 		ComPtr<ID3D12Resource>& pcBuffer,
@@ -110,7 +110,7 @@ private:
 		const CD3DX12_RESOURCE_DESC sDesc = CD3DX12_RESOURCE_DESC::Buffer(uBytesize);
 
 		// create actual
-		HRESULT nHr = pcDevice->CreateCommittedResource(
+		HRESULT nHr = psDevice->CreateCommittedResource(
 			&sPrpsD,
 			D3D12_HEAP_FLAG_NONE,
 			&sDesc,
@@ -119,7 +119,7 @@ private:
 			IID_PPV_ARGS(pcBuffer.GetAddressOf()));
 
 		// create temporary (upload)
-		nHr |= pcDevice->CreateCommittedResource(
+		nHr |= psDevice->CreateCommittedResource(
 			&sPrpsU,
 			D3D12_HEAP_FLAG_NONE,
 			&sDesc,
@@ -134,9 +134,9 @@ private:
 			const CD3DX12_RB_TRANSITION sResBr1(pcBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
 
 			// schedule update to command list, keep upload buffers until executed
-			pcCmdList->ResourceBarrier(1, &sResBr0);
-			UpdateSubresources<1>(pcCmdList, pcBuffer.Get(), pcBufferTmp.Get(), 0, 0, 1, &sSubData);
-			pcCmdList->ResourceBarrier(1, &sResBr1);
+			psCmdList->ResourceBarrier(1, &sResBr0);
+			UpdateSubresources<1>(psCmdList, pcBuffer.Get(), pcBufferTmp.Get(), 0, 0, 1, &sSubData);
+			psCmdList->ResourceBarrier(1, &sResBr1);
 		}
 
 		return nHr;

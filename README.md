@@ -42,3 +42,5 @@ SC   - swapchain
 DS   - depthstencil
 Rtv  - render target view
 Dsv  - depth stencil view
+Rng  - range
+H    - handle
