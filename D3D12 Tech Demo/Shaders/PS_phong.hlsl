@@ -24,12 +24,21 @@ struct In
 
 float4 main(In sIn) : SV_Target
 {
-	// normalized pixel coordinates
-	float2 sUV = sIn.sPosH.xy / sViewport.zw;
+	//// normalized pixel coordinates
+	//float2 sUV = sIn.sPosH.xy / sViewport.zw;
 
-	// time varying pixel color
-	float4 sCol = float4(0.5 + 0.5 * cos(sTime.x + sUV.xyx + float3(0.,2.,4.)), 1.);
+	//// time varying pixel color
+	//float4 sCol = float4(0.5 + 0.5 * cos(sTime.x + sUV.xyx + float3(0.,2.,4.)), 1.);
+	//
+	//// mix
+	//return lerp(sIn.sCol, sCol, .5);
 
-	// mix
-	return lerp(sIn.sCol, sCol, .5);
+	// pass color
+	// return sIn.sCol;
+
+	float fA = smoothstep(0.99, 0.995, sIn.sCol.x);
+	float fB = smoothstep(0.99, 0.995, sIn.sCol.y);
+	float fC = smoothstep(0.99, 0.995, sIn.sCol.z);
+	float fD = smoothstep(0.49, 0.495, 1. - dot(sIn.sCol.xyz, float3(.5, .5, .5)));
+	return float4(max(fA, fD), max(fB, fD), max(fC, fD), 1.);
 }

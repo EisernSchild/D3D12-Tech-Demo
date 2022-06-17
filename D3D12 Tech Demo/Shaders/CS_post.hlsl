@@ -80,7 +80,7 @@ void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThre
 	// float4 sPostCol = float4(bevel(sTexIn, sDispatchTID.xy, float2(cos(sTime.x * 1.3), sin(sTime.x * 2.0)), 4.), 1.);
 
 	// smoothing
-	float4 sPostCol = float4(smooth(sTexIn, sDispatchTID.xy, floor(lerp(float2(1., 1.), float2(25., 25.), abs(sin(sTime.x * 1.5)))), 3.), 1.);
+	float4 sPostCol = float4(smooth(sTexIn, sDispatchTID.xy, float2(4., 4.), 1.), 1.);
 
 	// radial blur
 	// float4 sPostCol = float4(blur_radial(sTexIn, sDispatchTID.xy, 10., 2., .1 * abs(sin(sTime.x * 1.5)), (sViewport.zw * .5) - sDispatchTID.xy), 1.);

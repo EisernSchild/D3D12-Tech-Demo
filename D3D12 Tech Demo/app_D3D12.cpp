@@ -250,8 +250,8 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	{
 		// meanwhile const
 		const float fRadius = 2.f * (float)abs(sin((double)sData.fTotal * 2.1f)) + 4.f;
-		const float fTheta = (float)sin((double)sData.fTotal * 1.7f);
-		const float fPhi = (float)cos((double)sData.fTotal * 1.5f);;
+		const float fTheta = fmod(sData.fTotal, XM_2PI);
+		const float fPhi = (float)abs(cos((double)sData.fTotal * 1.5f));
 
 		// meanwhile compute here
 		XMFLOAT4X4 sWorld, sView, sProj;
@@ -634,7 +634,7 @@ signed App_D3D12::CreateTextures()
 			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING, {}
 		};
 		sSrvDc.Texture2D = { 0, 1, 0, 0.0f };
-		
+
 		D3D12_UNORDERED_ACCESS_VIEW_DESC sUavDc = {
 			m_sD3D.eBackbufferFmt,
 			D3D12_UAV_DIMENSION_TEXTURE2D, {}
@@ -691,7 +691,54 @@ signed App_D3D12::BuildGeometry()
 		4, 3, 7
 	};
 
-	m_sD3D.pcMeshBox = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asVertices, auIndices, "box");
+	// m_sD3D.pcMeshBox = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asVertices, auIndices, "box");
+
+	// create basic hexagon with 6 triangles
+	// (each triangle one side and center)
+	float fHalfWidth = sqrt(1.f - (.5f * .5f));
+	std::vector<XMFLOAT3> asHexVtc =
+	{
+		{        0.0f, 0.0f,  0.0f }, // center
+		{        0.0f, 0.0f, -1.0f }, // top
+		{  fHalfWidth, 0.0f, -0.5f }, // top right
+		{  fHalfWidth, 0.0f,  0.5f }, // bottom right
+		{        0.0f, 0.0f,  1.0f }, // bottom
+		{ -fHalfWidth, 0.0f,  0.5f }, // bottom left
+		{ -fHalfWidth, 0.0f, -0.5f }, // top left
+	};
+	std::vector<std::uint16_t> auHexIdc =
+	{
+		1, 0, 2, // top-center-top right
+		2, 0, 3, // top right-center-bottom right
+		3, 0, 4, // ....
+		4, 0, 5,
+		5, 0, 6,
+		6, 0, 1
+	};
+
+	// subdivide each triangle to 3 triangles
+	for (unsigned uI(0); uI < 6; uI++)
+	{
+		// ...
+	}
+
+	// convert to d3d vertex
+	std::vector<VertexPosCol> asHexagonVtc;
+	unsigned uI(0);
+	for (XMFLOAT3& sV : asHexVtc)
+	{
+		switch (uI)
+		{
+		case 0: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::White) }); break;
+		case 1: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Lime) }); break;
+		case 2: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Red) }); break;
+		case 3: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Blue) }); break;
+		default: break;
+		}
+		uI++; if (uI >= 4) uI = 1;
+	}
+
+	m_sD3D.pcMeshBox = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, "hexagon");
 
 	return APP_FORWARD;
 }
