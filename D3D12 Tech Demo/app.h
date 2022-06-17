@@ -7,9 +7,12 @@
 #define _APP_GENERIC
 
 #include <stdio.h>
+#include <string>
 #include <thread>
 #include <future>
 #include <array>
+
+constexpr std::wstring_view s_atAppname = L"D3D12 Tech Demo";
 
 #ifdef _WIN32
 #ifndef UNICODE
@@ -420,22 +423,15 @@ protected:
 		sWindowClass.lpszClassName = L"App_Windows";
 		RegisterClassEx(&sWindowClass);
 
-		RECT sRcDeskt = {};
-		GetClientRect(GetDesktopWindow(), &sRcDeskt);
-		m_sClientSize.nW = sRcDeskt.right >> 1;
-		m_sClientSize.nH = (sRcDeskt.right >> 5) * 9;
-		RECT sRect = { 0, 0, m_sClientSize.nW, m_sClientSize.nH };
-		AdjustWindowRect(&sRect, WS_OVERLAPPEDWINDOW, FALSE);
-
 		// create the window
 		m_pHwnd = CreateWindow(
 			sWindowClass.lpszClassName,
-			L"scrith sample",
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			sRect.right - sRect.left,
-			sRect.bottom - sRect.top,
+			std::wstring(s_atAppname).c_str(),
+			WS_OVERLAPPEDWINDOW | WS_MAXIMIZE,
+			0,
+			0,
+			GetSystemMetrics(SM_CXSCREEN),
+			GetSystemMetrics(SM_CYSCREEN),
 			nullptr,
 			nullptr,
 			pHInstance,
@@ -443,13 +439,31 @@ protected:
 
 		// show the window
 		ShowWindow(m_pHwnd, SW_SHOW);
-		ShowCursor(FALSE);
-
+		
+		// get viewport
+		RECT sRect = {};
+		GetClientRect(m_pHwnd, &sRect);
+		m_sClientSize.nW = sRect.right;
+		m_sClientSize.nH = sRect.bottom;
+		
 		return APP_FORWARD;
 	}
 	/// <summary></summary>
 	FUNC_GAME_TASK(OsUpdate)
 	{
+		std::wstring atFps = std::to_wstring(sData.fFPS);
+		std::wstring atFpsTotal = std::to_wstring(sData.fFPSTotal);
+		std::wstring atTime = std::to_wstring(sData.fTotal);
+		std::wstring atDelta = std::to_wstring(sData.fDelta);
+
+		std::wstring atWinText = std::wstring(s_atAppname) +
+			L"   fps: " + atFps +
+			L"   fps total: " + atFpsTotal +
+			L"   time: " + atTime +
+			L"   delta: " + atDelta;
+
+		SetWindowText(m_pHwnd, atWinText.c_str());
+
 		return APP_FORWARD;
 	}
 	/// <summary>Handle Window Messages</summary>

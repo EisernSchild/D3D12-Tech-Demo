@@ -249,9 +249,9 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	/// world - view - projection
 	{
 		// meanwhile const
-		const float fRadius = 8.f;
-		const float fTheta = 1.5f * XM_PI;
-		const float fPhi = XM_PIDIV4;
+		const float fRadius = 2.f * (float)abs(sin((double)sData.fTotal * 2.1f)) + 4.f;
+		const float fTheta = (float)sin((double)sData.fTotal * 1.7f);
+		const float fPhi = (float)cos((double)sData.fTotal * 1.5f);;
 
 		// meanwhile compute here
 		XMFLOAT4X4 sWorld, sView, sProj;
