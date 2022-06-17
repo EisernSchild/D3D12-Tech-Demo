@@ -719,7 +719,67 @@ signed App_D3D12::BuildGeometry()
 	// subdivide each triangle to 3 triangles
 	for (unsigned uI(0); uI < 6; uI++)
 	{
-		// ...
+		// move the last triangle
+		std::array<uint16_t, 3> auTriangle;
+		for (unsigned uJ : {2, 1, 0})
+		{
+			auTriangle[uJ] = auHexIdc.back();
+			auHexIdc.pop_back();
+		}
+
+		// create the new vertices
+		std::array<XMFLOAT3, 3> asNewVtc;
+		for (unsigned uJ : {0, 1, 2})
+		{
+			asNewVtc[uJ] = {
+				0.5f * (asHexVtc[auTriangle[uJ]].x + asHexVtc[auTriangle[(uJ + 1) % 3]].x),
+				0.5f * (asHexVtc[auTriangle[uJ]].y + asHexVtc[auTriangle[(uJ + 1) % 3]].y),
+				0.5f * (asHexVtc[auTriangle[uJ]].z + asHexVtc[auTriangle[(uJ + 1) % 3]].z)
+			};
+		}
+
+		// create new indices, push back non-existing vertices
+		std::array<uint16_t, 3> auNewIdc;
+		for (unsigned uJ : {0, 1, 2})
+		{
+			unsigned uK(0);
+			bool bExists = false;
+			for (XMFLOAT3& sV : asHexVtc)
+			{
+				if ((sV.x == asNewVtc[uJ].x) &&
+					(sV.y == asNewVtc[uJ].y) &&
+					(sV.z == asNewVtc[uJ].z))
+				{
+					// vertex already exists, set index
+					auNewIdc[uJ] = uK;
+					bExists = true;
+					break;
+				}
+				uK++;
+			}
+
+			// not existing ? set index, add to vertices
+			if (!bExists)
+			{
+				auNewIdc[uJ] = (uint16_t)asHexVtc.size();
+				asHexVtc.push_back(asNewVtc[uJ]);
+			}
+
+		}
+
+		// create the new triangles
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
+		auHexIdc.insert(auHexIdc.begin(), auTriangle[2]);
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
+		auHexIdc.insert(auHexIdc.begin(), auTriangle[1]);
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
+		auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
+		auHexIdc.insert(auHexIdc.begin(), auTriangle[0]);
 	}
 
 	// convert to d3d vertex
@@ -729,13 +789,12 @@ signed App_D3D12::BuildGeometry()
 	{
 		switch (uI)
 		{
-		case 0: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::White) }); break;
-		case 1: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Lime) }); break;
-		case 2: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Red) }); break;
-		case 3: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Blue) }); break;
+		case 0: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Lime) }); break;
+		case 1: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Red) }); break;
+		case 2: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Blue) }); break;
 		default: break;
 		}
-		uI++; if (uI >= 4) uI = 1;
+		uI++; if (uI >= 3) uI = 0;
 	}
 
 	m_sD3D.pcMeshBox = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, "hexagon");

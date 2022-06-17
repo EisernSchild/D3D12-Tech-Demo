@@ -34,11 +34,5 @@ float4 main(In sIn) : SV_Target
 	//return lerp(sIn.sCol, sCol, .5);
 
 	// pass color
-	// return sIn.sCol;
-
-	float fA = smoothstep(0.99, 0.995, sIn.sCol.x);
-	float fB = smoothstep(0.99, 0.995, sIn.sCol.y);
-	float fC = smoothstep(0.99, 0.995, sIn.sCol.z);
-	float fD = smoothstep(0.49, 0.495, 1. - dot(sIn.sCol.xyz, float3(.5, .5, .5)));
-	return float4(max(fA, fD), max(fB, fD), max(fC, fD), 1.);
+	return max(float4(.2, .3, .4, 1.), smoothstep(float4(.95, .95, .95, .95), float4(.99, .99, .99, .99), sIn.sCol));
 }
