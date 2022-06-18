@@ -26,15 +26,19 @@ struct Out
 {
 	float4 sPosH  : SV_POSITION;
 	float4 sCol   : COLOR;
+	float4 sUvPos : TEXCOORD0;
 };
 
-Out main(In sIn)
+Out main(in In sIn, in uint uIx : SV_VertexID)
 {
 	Out sOut;
 
 	// transform to homogeneous clip space, pass color
 	sOut.sPosH = mul(float4(sIn.sPosL, 1.0f), sWVP);
 	sOut.sCol = sIn.sCol;
+
+	// pass coordinate as uv (preliminary), set vertex id as w
+	sOut.sUvPos = float4(sIn.sPosL, (float)uIx);
 
 	return sOut;
 }

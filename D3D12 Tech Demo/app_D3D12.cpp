@@ -695,16 +695,17 @@ signed App_D3D12::BuildGeometry()
 
 	// create basic hexagon with 6 triangles
 	// (each triangle one side and center)
+	// set normalized distance 1.f to y
 	float fHalfWidth = sqrt(1.f - (.5f * .5f));
 	std::vector<XMFLOAT3> asHexVtc =
 	{
 		{        0.0f, 0.0f,  0.0f }, // center
-		{        0.0f, 0.0f, -1.0f }, // top
-		{  fHalfWidth, 0.0f, -0.5f }, // top right
-		{  fHalfWidth, 0.0f,  0.5f }, // bottom right
-		{        0.0f, 0.0f,  1.0f }, // bottom
-		{ -fHalfWidth, 0.0f,  0.5f }, // bottom left
-		{ -fHalfWidth, 0.0f, -0.5f }, // top left
+		{        0.0f, 1.0f, -1.0f }, // top
+		{  fHalfWidth, 1.0f, -0.5f }, // top right
+		{  fHalfWidth, 1.0f,  0.5f }, // bottom right
+		{        0.0f, 1.0f,  1.0f }, // bottom
+		{ -fHalfWidth, 1.0f,  0.5f }, // bottom left
+		{ -fHalfWidth, 1.0f, -0.5f }, // top left
 	};
 	std::vector<std::uint16_t> auHexIdc =
 	{
@@ -784,17 +785,18 @@ signed App_D3D12::BuildGeometry()
 
 	// convert to d3d vertex
 	std::vector<VertexPosCol> asHexagonVtc;
-	unsigned uI(0);
 	for (XMFLOAT3& sV : asHexVtc)
 	{
-		switch (uI)
-		{
-		case 0: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Lime) }); break;
-		case 1: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Red) }); break;
-		case 2: asHexagonVtc.push_back({ sV, XMFLOAT4(Colors::Blue) }); break;
-		default: break;
-		}
-		uI++; if (uI >= 3) uI = 0;
+		// color values : 
+		// xy - local position
+		// z - distance to mesh center
+		// w - normalized distance to mesh center ( = hexagon )
+		XMFLOAT4 sCol = { sV.x, sV.z, sqrt(sV.x * sV.x + sV.z * sV.z), sV.y};
+
+		// sV.y (preliminary normalized dist) to zero
+		sV.y = 0.f;
+
+		asHexagonVtc.push_back({ sV, sCol });
 	}
 
 	m_sD3D.pcMeshBox = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, "hexagon");
