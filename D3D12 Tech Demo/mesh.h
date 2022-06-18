@@ -44,12 +44,13 @@ protected:
 public:
 	/// <summary>buffer constants</summary>
 	UINT Indices_N() { return m_uIdcN; }
+	UINT Instances_N() { return m_uInstN; }
 
 protected:
 	/// <summary>buffer constants</summary>
 	const UINT m_uStrideV;
 	/// <summary>buffer constants</summary>
-	UINT m_uSizeV, m_uSizeI, m_uIdcN;
+	UINT m_uSizeV, m_uSizeI, m_uIdcN, m_uInstN;
 	/// <summary>buffer index format constant</summary>
 	const DXGI_FORMAT m_eFormatI;
 
@@ -66,12 +67,14 @@ public:
 		ID3D12GraphicsCommandList* psCmdList,
 		std::vector<VertexPosCol> asVtc,
 		std::vector<std::uint16_t> auIdc,
+		UINT uInstancesN = 1,
 		std::string atName = "mesh")
 		: Mesh<VertexPosCol>(psDevice, psCmdList, atName)
 	{
 		m_uSizeV = (UINT)asVtc.size() * sizeof(VertexPosCol);
 		m_uSizeI = (UINT)auIdc.size() * sizeof(std::uint16_t);
 		m_uIdcN = (UINT)auIdc.size();
+		m_uInstN = uInstancesN;
 
 		// create blobs and copy vertex/index data to them
 		ThrowIfFailed(D3DCreateBlob(m_uSizeV, &m_psBlobVB));

@@ -249,7 +249,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	/// world - view - projection
 	{
 		// meanwhile const
-		const float fRadius = 2.f * (float)abs(sin((double)sData.fTotal * 2.1f)) + 4.f;
+		const float fRadius = 2.f * (float)abs(sin((double)sData.fTotal * 2.1f)) + 24.f;
 		const float fTheta = fmod(sData.fTotal, XM_2PI);
 		const float fPhi = (float)abs(cos((double)sData.fTotal * 1.5f));
 
@@ -260,7 +260,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		XMStoreFloat4x4(&sProj, sP);
 
 		// Spherical to Cartesian
-		float x = fRadius * sinf(fPhi) * cosf(fTheta);
+		float x = fRadius * sinf(fPhi)* cosf(fTheta);
 		float z = fRadius * sinf(fPhi) * sinf(fTheta);
 		float y = fRadius * cosf(fPhi);
 
@@ -343,13 +343,13 @@ signed App_D3D12::Draw(const AppData& sData)
 	m_sD3D.psCmdList->SetGraphicsRootSignature(m_sD3D.psRootSign.Get());
 
 	// vertex, index buffer - topology,... and draw
-	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcMeshBox->ViewV();
-	D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcMeshBox->ViewI();
+	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcHexMesh->ViewV();
+	D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcHexMesh->ViewI();
 	m_sD3D.psCmdList->IASetVertexBuffers(0, 1, &sVBV);
 	m_sD3D.psCmdList->IASetIndexBuffer(&sIBV);
 	m_sD3D.psCmdList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(0, m_sD3D.psConstSRV->GetGPUDescriptorHandleForHeapStart());
-	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcMeshBox->Indices_N(), 1, 0, 0, 0);
+	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), m_sD3D.pcHexMesh->Instances_N(), 0, 0, 0);
 
 	// execute post processing
 	ExecutePostProcessing(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(),
@@ -652,154 +652,125 @@ signed App_D3D12::CreateTextures()
 
 signed App_D3D12::BuildGeometry()
 {
-	std::vector<VertexPosCol> asVertices =
+	// base hexagon
 	{
-		VertexPosCol({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
-		VertexPosCol({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
-		VertexPosCol({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
-		VertexPosCol({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
-		VertexPosCol({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
-		VertexPosCol({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
-		VertexPosCol({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
-		VertexPosCol({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
-	};
-
-	std::vector<std::uint16_t> auIndices =
-	{
-		// front face
-		0, 1, 2,
-		0, 2, 3,
-
-		// back face
-		4, 6, 5,
-		4, 7, 6,
-
-		// left face
-		4, 5, 1,
-		4, 1, 0,
-
-		// right face
-		3, 2, 6,
-		3, 6, 7,
-
-		// top face
-		1, 5, 6,
-		1, 6, 2,
-
-		// bottom face
-		4, 0, 3,
-		4, 3, 7
-	};
-
-	// m_sD3D.pcMeshBox = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asVertices, auIndices, "box");
-
-	// create basic hexagon with 6 triangles
-	// (each triangle one side and center)
-	// set normalized distance 1.f to y
-	float fHalfWidth = sqrt(1.f - (.5f * .5f));
-	std::vector<XMFLOAT3> asHexVtc =
-	{
-		{        0.0f, 0.0f,  0.0f }, // center
-		{        0.0f, 1.0f, -1.0f }, // top
-		{  fHalfWidth, 1.0f, -0.5f }, // top right
-		{  fHalfWidth, 1.0f,  0.5f }, // bottom right
-		{        0.0f, 1.0f,  1.0f }, // bottom
-		{ -fHalfWidth, 1.0f,  0.5f }, // bottom left
-		{ -fHalfWidth, 1.0f, -0.5f }, // top left
-	};
-	std::vector<std::uint16_t> auHexIdc =
-	{
-		1, 0, 2, // top-center-top right
-		2, 0, 3, // top right-center-bottom right
-		3, 0, 4, // ....
-		4, 0, 5,
-		5, 0, 6,
-		6, 0, 1
-	};
-
-	// subdivide each triangle to 3 triangles
-	for (unsigned uI(0); uI < 6; uI++)
-	{
-		// move the last triangle
-		std::array<uint16_t, 3> auTriangle;
-		for (unsigned uJ : {2, 1, 0})
+		// create basic hexagon with 6 triangles
+		// (each triangle one side and center)
+		// set normalized distance (= size unit = 1.f) to y
+		float fHalfWidth = sqrt(1.f - (.5f * .5f));
+		std::vector<XMFLOAT3> asHexVtc =
 		{
-			auTriangle[uJ] = auHexIdc.back();
-			auHexIdc.pop_back();
-		}
-
-		// create the new vertices
-		std::array<XMFLOAT3, 3> asNewVtc;
-		for (unsigned uJ : {0, 1, 2})
+			{        0.0f, 0.0f,  0.0f }, // center
+			{        0.0f, 1.0f, -1.0f }, // top
+			{  fHalfWidth, 1.0f, -0.5f }, // top right
+			{  fHalfWidth, 1.0f,  0.5f }, // bottom right
+			{        0.0f, 1.0f,  1.0f }, // bottom
+			{ -fHalfWidth, 1.0f,  0.5f }, // bottom left
+			{ -fHalfWidth, 1.0f, -0.5f }, // top left
+		};
+		std::vector<std::uint16_t> auHexIdc =
 		{
-			asNewVtc[uJ] = {
-				0.5f * (asHexVtc[auTriangle[uJ]].x + asHexVtc[auTriangle[(uJ + 1) % 3]].x),
-				0.5f * (asHexVtc[auTriangle[uJ]].y + asHexVtc[auTriangle[(uJ + 1) % 3]].y),
-				0.5f * (asHexVtc[auTriangle[uJ]].z + asHexVtc[auTriangle[(uJ + 1) % 3]].z)
-			};
-		}
+			1, 0, 2, // top-center-top right
+			2, 0, 3, // top right-center-bottom right
+			3, 0, 4, // ....
+			4, 0, 5,
+			5, 0, 6,
+			6, 0, 1
+		};
 
-		// create new indices, push back non-existing vertices
-		std::array<uint16_t, 3> auNewIdc;
-		for (unsigned uJ : {0, 1, 2})
+		// subdivide each triangle to 3 triangles
+		for (unsigned uI(0); uI < 6; uI++)
 		{
-			unsigned uK(0);
-			bool bExists = false;
-			for (XMFLOAT3& sV : asHexVtc)
+			// move the last triangle
+			std::array<uint16_t, 3> auTriangle;
+			for (unsigned uJ : {2, 1, 0})
 			{
-				if ((sV.x == asNewVtc[uJ].x) &&
-					(sV.y == asNewVtc[uJ].y) &&
-					(sV.z == asNewVtc[uJ].z))
+				auTriangle[uJ] = auHexIdc.back();
+				auHexIdc.pop_back();
+			}
+
+			// create the new vertices
+			std::array<XMFLOAT3, 3> asNewVtc;
+			for (unsigned uJ : {0, 1, 2})
+			{
+				asNewVtc[uJ] = {
+					0.5f * (asHexVtc[auTriangle[uJ]].x + asHexVtc[auTriangle[(uJ + 1) % 3]].x),
+					0.5f * (asHexVtc[auTriangle[uJ]].y + asHexVtc[auTriangle[(uJ + 1) % 3]].y),
+					0.5f * (asHexVtc[auTriangle[uJ]].z + asHexVtc[auTriangle[(uJ + 1) % 3]].z)
+				};
+			}
+
+			// create new indices, push back non-existing vertices
+			std::array<uint16_t, 3> auNewIdc;
+			for (unsigned uJ : {0, 1, 2})
+			{
+				unsigned uK(0);
+				bool bExists = false;
+				for (XMFLOAT3& sV : asHexVtc)
 				{
-					// vertex already exists, set index
-					auNewIdc[uJ] = uK;
-					bExists = true;
-					break;
+					if ((sV.x == asNewVtc[uJ].x) &&
+						(sV.y == asNewVtc[uJ].y) &&
+						(sV.z == asNewVtc[uJ].z))
+					{
+						// vertex already exists, set index
+						auNewIdc[uJ] = uK;
+						bExists = true;
+						break;
+					}
+					uK++;
 				}
-				uK++;
+
+				// not existing ? set index, add to vertices
+				if (!bExists)
+				{
+					auNewIdc[uJ] = (uint16_t)asHexVtc.size();
+					asHexVtc.push_back(asNewVtc[uJ]);
+				}
+
 			}
 
-			// not existing ? set index, add to vertices
-			if (!bExists)
-			{
-				auNewIdc[uJ] = (uint16_t)asHexVtc.size();
-				asHexVtc.push_back(asNewVtc[uJ]);
-			}
-
+			// create the new triangles
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
+			auHexIdc.insert(auHexIdc.begin(), auTriangle[2]);
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
+			auHexIdc.insert(auHexIdc.begin(), auTriangle[1]);
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
+			auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
+			auHexIdc.insert(auHexIdc.begin(), auTriangle[0]);
 		}
 
-		// create the new triangles
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
-		auHexIdc.insert(auHexIdc.begin(), auTriangle[2]);
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[1]);
-		auHexIdc.insert(auHexIdc.begin(), auTriangle[1]);
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[2]);
-		auHexIdc.insert(auHexIdc.begin(), auNewIdc[0]);
-		auHexIdc.insert(auHexIdc.begin(), auTriangle[0]);
+		// convert to d3d vertex
+		std::vector<VertexPosCol> asHexagonVtc;
+		for (XMFLOAT3& sV : asHexVtc)
+		{
+			// color values : 
+			// xy - local position
+			// z - distance to mesh center
+			// w - normalized distance to mesh center ( = hexagon )
+			XMFLOAT4 sCol = { sV.x, sV.z, sqrt(sV.x * sV.x + sV.z * sV.z), sV.y };
+
+			// sV.y (preliminary normalized dist) to zero
+			sV.y = 0.f;
+
+			asHexagonVtc.push_back({ sV, sCol });
+		}
+
+		// number of hex ambits (or "circles") around the main hexagon
+		const unsigned uAmbitN = 9;
+		unsigned uInstN = 1;
+		unsigned uAmbitTileN = 6;
+		for (unsigned uI(0); uI < uAmbitN; uI++)
+		{
+			uInstN += uAmbitTileN;
+			uAmbitTileN += 6;
+		}
+		m_sD3D.pcHexMesh = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, uInstN, "hexagon");
 	}
-
-	// convert to d3d vertex
-	std::vector<VertexPosCol> asHexagonVtc;
-	for (XMFLOAT3& sV : asHexVtc)
-	{
-		// color values : 
-		// xy - local position
-		// z - distance to mesh center
-		// w - normalized distance to mesh center ( = hexagon )
-		XMFLOAT4 sCol = { sV.x, sV.z, sqrt(sV.x * sV.x + sV.z * sV.z), sV.y};
-
-		// sV.y (preliminary normalized dist) to zero
-		sV.y = 0.f;
-
-		asHexagonVtc.push_back({ sV, sCol });
-	}
-
-	m_sD3D.pcMeshBox = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, "hexagon");
 
 	return APP_FORWARD;
 }

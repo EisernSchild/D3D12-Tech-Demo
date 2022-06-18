@@ -88,8 +88,8 @@ protected:
 		D3D12_VIEWPORT sScreenVp;
 		/// <summary>the scissor rectangle</summary>
 		D3D12_RECT sScissorRc;
-		/// <summary>mesh of the sample box</summary>
-		std::unique_ptr<Mesh_PosCol> pcMeshBox = nullptr;
+		/// <summary>base hexagon mesh</summary>
+		std::unique_ptr<Mesh_PosCol> pcHexMesh = nullptr;
 		/// <summary>shaders root signature</summary>
 		ComPtr<ID3D12RootSignature> psRootSign = nullptr;
 		/// <summary>constant buffer view descriptor heap</summary>

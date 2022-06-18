@@ -53,6 +53,9 @@
   <ItemGroup>
     <None Include="..\..\..\LICENSE" />
     <None Include="..\..\..\README.md" />
+    <None Include="..\..\Shaders\fbm.hlsli">
+      <Filter>shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\PS_phong.hlsl">

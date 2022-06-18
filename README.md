@@ -27,7 +27,7 @@ N    - number
 Nme  - name
 I/Ix - index
 Idc  - indices
-V    - vertex
+V/Vx - vertex
 Vp   - viewport
 Vtc  - vertices
 T    - type (enumeration)
