@@ -12,6 +12,10 @@
 // negative coordinates within a few orders of magnitude.
 
 #define PI 3.141592654f
+#define FLT_MAX 3.402823466e+38F
+
+// static const float2 sFbmOffset = float2(FLT_MAX * .01f, FLT_MAX * .01f);
+static const float2 sFbmOffset = float2(50000.f, 5000.f);
 
 float random(in float2 st) {
 	return frac(sin(dot(st.xy,
@@ -42,6 +46,8 @@ float fbm(in float2 st) {
 	float value = 0.0;
 	float amplitude = .5;
 	float frequency = 0.;
+	// set an offset
+	st += sFbmOffset;
 	//
 	// Loop of octaves
 	for (int i = 0; i < OCTAVES; i++) {

@@ -761,7 +761,7 @@ signed App_D3D12::BuildGeometry()
 		}
 
 		// number of hex ambits (or "circles") around the main hexagon
-		const unsigned uAmbitN = 9;
+		const unsigned uAmbitN = 15;
 		unsigned uInstN = 1;
 		unsigned uAmbitTileN = 6;
 		for (unsigned uI(0); uI < uAmbitN; uI++)
@@ -771,7 +771,7 @@ signed App_D3D12::BuildGeometry()
 		}
 		m_sD3D.pcHexMesh = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, uInstN, "hexagon");
 	}
-
+	
 	return APP_FORWARD;
 }
 

@@ -37,16 +37,25 @@ float4 main(in In sIn) : SV_Target
 
 	// pass color
 	// return sIn.sCol;
-	
+
 	// compute terrain.. we later move that to the compute shader
-	float fY = fbm(sIn.sUvPos.xz * .1);
+	float2 sUV = sIn.sUvPos.xz;
+	float fY = fbm((sUV) * .1);
+	float3 sCol = lerp(float3(0.2, 0.1, 0.0), float3(0.3, .9, 0.1), fY);
+	float fFall = abs((fbm((sUV) * .1 - float2(.1, .0)) - fbm((sUV) * .1 + float2(.1, .0))) +
+		abs(fbm((sUV) * .1 - float2(.0, .1)) - fbm((sUV) * .1 + float2(.0, .1)))) * .25f;
+	float3 fX = fbm(sUV * 30.);
+	float3 sCol1 = float3(.7, .7, .7) * fX;
+	sCol = lerp(sCol, float3(107.f / 256.f, 78.f / 256.f, 58.f / 256.f), fFall * 10.);
+	sCol = lerp(sCol, sCol1, sqrt(fFall));
+	return float4(sCol, 1.);
 
 	// draw b/w grid based on uv position
-	return max(float4(0.02, 0.035, 0.065, 1.) * pow(sIn.sPosH.z * 2., 4) * fY,
-		smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), frac(sIn.sUvPos.x * 5.)) +
-		smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), 1. - frac(sIn.sUvPos.x * 5.)) +
-		smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), frac(sIn.sUvPos.z * 5.)) +
-		smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), 1. - frac(sIn.sUvPos.z * 5.)));
+	/*return max(lerp(float4(0.2, 0.3, 0.4, 1.), float4(0.1, 1., 0.2, 1.), fY) + pow(sIn.sPosH.z, 2) * .001,
+	smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), frac(sIn.sUvPos.x * 5.)) +
+	smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), 1. - frac(sIn.sUvPos.x * 5.)) +
+	smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), frac(sIn.sUvPos.z * 5.)) +
+	smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), 1. - frac(sIn.sUvPos.z * 5.)));*/
 
 	// simple hexagons
 	/*return max(float4(0.02, 0.025, 0.025, 1.) * pow(sIn.sPosH.z * 2., 3),

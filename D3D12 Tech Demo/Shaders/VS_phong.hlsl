@@ -79,7 +79,8 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 	float3 sPosL = sIn.sPosL + float3(sInstOffset.x, 0., sInstOffset.y);
 
 	// compute terrain.. we later move that to the compute shader
-	sPosL.y = fbm(sPosL.xz * .1) * 12.;
+	float2 sUV = sPosL.xz;
+	sPosL.y = fbm(sUV * .1) * 12.;
 	
 	sOut.sPosH = mul(float4(sPosL, 1.0f), sWVP);
 	sOut.sCol = sIn.sCol;
