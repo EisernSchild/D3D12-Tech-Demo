@@ -77,13 +77,13 @@ void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThre
 	// float4 sPostCol = sTexIn[sDispatchTID.xy];
 
 	// bevel
-	// float4 sPostCol = float4(bevel(sTexIn, sDispatchTID.xy, float2(cos(sTime.x * 1.3), sin(sTime.x * 2.0)), 4.), 1.);
+	// float4 sPostCol = float4(bevel(sTexIn, sDispatchTID.xy, float2(cos(1.3), sin(2.0)), 4.), 1.);
 
 	// smoothing
-	float4 sPostCol = float4(smooth(sTexIn, sDispatchTID.xy, float2(4., 4.), 1.), 1.);
+	float4 sPostCol = float4(smooth(sTexIn, sDispatchTID.xy, float2(2., 2.), 2.), 1.);
 
 	// radial blur
-	// float4 sPostCol = float4(blur_radial(sTexIn, sDispatchTID.xy, 10., 2., .1 * abs(sin(sTime.x * 1.5)), (sViewport.zw * .5) - sDispatchTID.xy), 1.);
+	// float4 sPostCol = float4(blur_radial(sTexIn, sDispatchTID.xy, 10., 2., .00075, (sViewport.zw * .5) - sDispatchTID.xy), 1.);
 
 	// vignette
 	float2 sUV = ((float2(float(sDispatchTID.x), float(sDispatchTID.y)) / sViewport.zw) - .5) * 2.;

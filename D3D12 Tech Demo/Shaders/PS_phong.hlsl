@@ -39,15 +39,15 @@ float4 main(in In sIn) : SV_Target
 	// return sIn.sCol;
 
 	// compute terrain.. we later move that to the compute shader
-	float2 sUV = sIn.sUvPos.xz;
-	float fY = fbm((sUV) * .1);
-	float3 sCol = lerp(float3(0.2, 0.1, 0.0), float3(0.3, .9, 0.1), fY);
-	float fFall = abs((fbm((sUV) * .1 - float2(.1, .0)) - fbm((sUV) * .1 + float2(.1, .0))) +
-		abs(fbm((sUV) * .1 - float2(.0, .1)) - fbm((sUV) * .1 + float2(.0, .1)))) * .25f;
-	float3 fX = fbm(sUV * 30.);
+	float2 sUV = float2(sIn.sUvPos.x + (sTime.x * 20.), sIn.sUvPos.z);
+	float fY = (fbm(fbm(sUV * .03)) - .2) * 4.;
+	float3 sCol = lerp(float3(0.2, 0.1, 0.0), float3(0.5, .9, 0.1), fY);
+	float fFall = abs((fbm(fbm(sUV * .03 - float2(.01, .0))) - fbm(fbm(sUV * .03 + float2(.01, .0)))) +
+		abs(fbm(fbm(sUV * .03 - float2(.0, .01))) - fbm(fbm(sUV * .01 + float2(.0, .01))))) *.01f;
+	float3 fX = fbm(sUV * 2.);
 	float3 sCol1 = float3(.7, .7, .7) * fX;
-	sCol = lerp(sCol, float3(107.f / 256.f, 78.f / 256.f, 58.f / 256.f), fFall * 10.);
-	sCol = lerp(sCol, sCol1, sqrt(fFall));
+	sCol = lerp(sCol, float3(107.f / 256.f, 78.f / 256.f, 58.f / 256.f), fFall * 80.);
+	sCol = lerp(sCol, sCol1, sqrt(fFall) * 2.5);
 	return float4(sCol, 1.);
 
 	// draw b/w grid based on uv position
