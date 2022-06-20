@@ -1,5 +1,5 @@
 // D3D12 Tech Demo
-// (c) 2022 by Denis Reischl
+// Copyright © 2022 by Denis Reischl
 // 
 // SPDX-License-Identifier: MIT
 
@@ -249,7 +249,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	/// world - view - projection
 	{
 		// meanwhile const
-		const float fRadius = 10.f * (float)abs(sin((double)sData.fTotal * 2.1f)) + 20.f;
+		const float fRadius = 10.f * (float)abs(sin((double)sData.fTotal * 2.1f)) + 40.f;
 		const float fTheta = 1.5f * XM_PI;
 		const float fPhi = XM_PIDIV4;
 		// const float fTheta = fmod(sData.fTotal, XM_2PI);

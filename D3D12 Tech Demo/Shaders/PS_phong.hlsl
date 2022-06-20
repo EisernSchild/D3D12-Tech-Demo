@@ -1,5 +1,5 @@
 // D3D12 Tech Demo
-// (c) 2022 by Denis Reischl
+// Copyright © 2022 by Denis Reischl
 // 
 // SPDX-License-Identifier: MIT
 
@@ -30,26 +30,26 @@ float graduate(float fV, float fR)
 	return clamp((0.5 * fR - abs(0.5 - fmod(fV + 0.5, 1.0))) * 2.0 / fR, 0.0, 1.0);
 }
 
+float2 graduate(float2 fV, float fR)
+{
+	return clamp((0.5 * fR - abs(0.5 - fmod(fV + 0.5, 1.0))) * 2.0 / fR, 0.0, 1.0);
+}
+
+float3 graduate(float3 fV, float fR)
+{
+	return clamp((0.5 * fR - abs(0.5 - fmod(fV + 0.5, 1.0))) * 2.0 / fR, 0.0, 1.0);
+}
+
 float4 main(in In sIn) : SV_Target
 {
-	//// normalized pixel coordinates
-	// float2 sUV = sIn.sPosH.xy / sViewport.zw;
-
-	// pass color
-	// return sIn.sCol;
-
-	// compute terrain.. we later move that to the compute shader
+	// compute terrain texture.. we later move that to the compute shader
+	// float2 sUV = sIn.sUvPos.xz; 
 	float2 sUV = float2(sIn.sUvPos.x + (sTime.x * 20.), sIn.sUvPos.z);
-	float fY = (fbm(fbm(sUV * .03)) - .2) * 4.;
-	float3 sCol = lerp(float3(0.2, 0.1, 0.0), float3(0.5, .9, 0.1), fY);
-	float fFall = abs((fbm(fbm(sUV * .03 - float2(.01, .0))) - fbm(fbm(sUV * .03 + float2(.01, .0)))) +
-		abs(fbm(fbm(sUV * .03 - float2(.0, .01))) - fbm(fbm(sUV * .01 + float2(.0, .01))))) *.01f;
-	float3 fX = fbm(sUV * 2.);
-	float3 sCol1 = float3(.7, .7, .7) * fX;
-	sCol = lerp(sCol, float3(107.f / 256.f, 78.f / 256.f, 58.f / 256.f), fFall * 80.);
-	sCol = lerp(sCol, sCol1, sqrt(fFall) * 2.5);
-	return float4(sCol, 1.);
+	float fFbmScale = .05f;
+	float3 afHeight = fbm(sUV * fFbmScale, 1.);
 
+	return float4(.2, afHeight.yz, 1.);
+	
 	// draw b/w grid based on uv position
 	/*return max(lerp(float4(0.2, 0.3, 0.4, 1.), float4(0.1, 1., 0.2, 1.), fY) + pow(sIn.sPosH.z, 2) * .001,
 	smoothstep(float4(.9, .9, .9, .9), float4(1., 1., 1., 1.), frac(sIn.sUvPos.x * 5.)) +
@@ -63,12 +63,4 @@ float4 main(in In sIn) : SV_Target
 		smoothstep(float3(.9f, .9f, .9f), float3(.99f, .99f, .99f), frac(sIn.sCol.w * 8.)) +
 		smoothstep(float3(.9f, .9f, .9f), float3(.99f, .99f, .99f), 1. - frac(sIn.sCol.w * 8.))
 	, 1.f));*/
-
-	//// dancing hexagons
-	//float3 sBaseCol = float3(fmod(abs(sin(sTime.x)), sIn.sCol.w), fmod(abs(cos(sTime.x * 1.2f)), sIn.sCol.w), fmod(abs(sin(sTime.x * .5f)), sIn.sCol.w));
-	//float3 sCol = sBaseCol;
-	//float fRepeat = .1;
-	//sCol *= smoothstep(0.015 * 2., .0, abs(fmod(sIn.sCol.w + .5 * fRepeat, fRepeat) - .5 * fRepeat));
-	//sCol *= graduate(sIn.sCol.w + sTime.x, 0.75);
-	//return float4(max(sBaseCol * .5 * pow(sIn.sPosH.z, 3), sCol), 1.f);
 }

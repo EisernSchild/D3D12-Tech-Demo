@@ -1,5 +1,5 @@
 // D3D12 Tech Demo
-// (c) 2022 by Denis Reischl
+// Copyright © 2022 by Denis Reischl
 // 
 // SPDX-License-Identifier: MIT
 
@@ -75,13 +75,17 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 			sInstOffset += to_next_field(fS, uOffset + 2) * (float)(uIx / 6);
 	}
 
-	// transform to homogeneous clip space, pass color
+	// get world position with zero height (y)
 	float3 sPosL = sIn.sPosL + float3(sInstOffset.x, 0., sInstOffset.y);
 
 	// compute terrain.. we later move that to the compute shader
+	// float2 sUV = sPosL.xz;
 	float2 sUV = float2(sPosL.x + (sTime.x * 20.), sPosL.z);
-	sPosL.y = (fbm(fbm(sUV * .03)) - .2) * 60.;
+	const float2 afFbmScale = float2(.05f, 10.f);
+	float3 afHeight = fbm(sUV * afFbmScale.x, 1.) * afFbmScale.y;
+	sPosL.y = afHeight.x;
 
+	// transform to homogeneous clip space, pass color
 	sOut.sPosH = mul(float4(sPosL, 1.0f), sWVP);
 	sOut.sCol = sIn.sCol;
 

@@ -17,6 +17,7 @@ p - pointer
 s - structure
 t - byte/char (token)
 u - unsigned
+v - vector (hlsl only)
 
 ### superiour
 m - member
