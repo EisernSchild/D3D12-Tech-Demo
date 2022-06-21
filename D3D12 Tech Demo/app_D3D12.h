@@ -11,8 +11,7 @@
 #ifndef _APP_D3D12_GENERIC
 #define _APP_D3D12_GENERIC
 
-#ifdef _WIN32
-
+#ifdef _WIN64
 
 /// <summary>
 /// D3D12 application

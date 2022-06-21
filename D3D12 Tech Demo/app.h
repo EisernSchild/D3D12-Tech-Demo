@@ -19,11 +19,13 @@ typedef struct { float x, y, z, w; } float4;
 
 constexpr std::wstring_view s_atAppname = L"D3D12 Tech Demo";
 
-#ifdef _WIN32
+#ifdef _WIN64
 #ifndef UNICODE
 #define UNICODE
 #endif
 #include <Windows.h>
+#include <Xinput.h>
+#pragma comment(lib, "Xinput.lib")
 #define TRACE_UINT(a) { wchar_t buf[128]; wsprintfW(buf, L"%s:%u:0x%x", L#a, a, a); OutputDebugStringW(buf); }
 #define TRACE_HEX(a) { wchar_t buf[128]; wsprintfW(buf,  L"%s:%x", L#a, a); OutputDebugStringW(buf); }
 #define TRACE_ERROR(a) { wchar_t buf[128]; wsprintfW(buf,  L"Error %s:%x", L#a, a); OutputDebugStringW(buf); }
@@ -37,7 +39,7 @@ constexpr std::wstring_view s_atAppname = L"D3D12 Tech Demo";
 #error "OS not supported!"
 #endif
 
-#ifdef _WIN32
+#ifdef _WIN64
 #define GameTimer game_timer
 
 /// <summary>Game Time simple helper</summary>
@@ -392,7 +394,7 @@ private:
 	GameTimer m_cTimer;
 };
 
-#ifdef _WIN32
+#ifdef _WIN64
 #define APP_Os App_Windows
 
 /// <summary>

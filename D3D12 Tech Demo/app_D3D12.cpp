@@ -19,6 +19,16 @@ XMFLOAT2 operator*(const XMFLOAT2& sMultiplier, const float& fMultiplicant) {
 	return XMFLOAT2(sMultiplier.x * fMultiplicant, sMultiplier.y * fMultiplicant);
 }
 
+XMFLOAT3 operator+(const XMFLOAT3& sSummand0, const XMFLOAT3& sSummand1) {
+	return XMFLOAT3(sSummand0.x + sSummand1.x, sSummand0.y + sSummand1.y, sSummand0.z + sSummand1.z);
+}
+XMFLOAT3 operator*(const XMFLOAT3& sMultiplier, const XMFLOAT3& sMultiplicant) {
+	return XMFLOAT3(sMultiplier.x * sMultiplicant.x, sMultiplier.y * sMultiplicant.z, sMultiplier.z * sMultiplicant.z);
+}
+XMFLOAT3 operator*(const XMFLOAT3& sMultiplier, const float& fMultiplicant) {
+	return XMFLOAT3(sMultiplier.x * fMultiplicant, sMultiplier.y * fMultiplicant, sMultiplier.z * fMultiplicant);
+}
+
 signed App_D3D12::GxInit(AppData& sData)
 {
 	OutputDebugStringA("App_D3D12::GxInit");
@@ -255,32 +265,55 @@ signed App_D3D12::OnResize()
 signed App_D3D12::UpdateConstants(const AppData& sData)
 {
 	ConstantsScene sConstants = {};
-
+	static float s_fTimeOld = 0.f;
+	float fTimeEl = sData.fTotal - s_fTimeOld;
+		
 	/// world - view - projection
 	{
-		// meanwhile const
-		const float fRadius = 10.f * (float)abs(sin((double)sData.fTotal * 2.1f)) + 40.f;
-		const float fTheta = 1.5f * XM_PI;
-		const float fPhi = XM_PIDIV4;
-		
-		// meanwhile compute here
+		static XMFLOAT3 s_sPos = XMFLOAT3(0.f, 10.f, 0.f);
+		static XMFLOAT3 s_sVelo = XMFLOAT3(0.f, 0.f, 0.f);
+		static XMFLOAT3 s_sTarget = XMFLOAT3();
+		const XMVECTOR sUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+		const float fAcceleration = .1f, fAccelerationYaw = 4.f;
+		const float fDeceleration = .995f;
+		static float s_fYaw = 0.f;
+		static float s_fPitch = 0.f;
+
+		// get controller 0 state
+		XINPUT_STATE sState = {};
+		uint32_t uR = XInputGetState(0, &sState);
+		if (uR == ERROR_SUCCESS)
+		{
+			// position xz
+			float fThX = ((float)sState.Gamepad.sThumbLX / 32767.f) * fTimeEl * fAcceleration;
+			float fThY = ((float)sState.Gamepad.sThumbLY / 32767.f) * fTimeEl * fAcceleration;
+			s_sVelo.x += fThX * cosf(s_fYaw) - fThY * sinf(s_fYaw);
+			s_sVelo.z += fThX * sinf(s_fYaw) + fThY * cosf(s_fYaw);
+
+			// height y
+			s_sVelo.y += ((float)sState.Gamepad.bRightTrigger / 256.f) * fTimeEl * fAcceleration;
+			s_sVelo.y -= ((float)sState.Gamepad.bLeftTrigger / 256.f) * fTimeEl * fAcceleration;
+
+			// yaw, pitch
+			s_fYaw -= ((float)sState.Gamepad.sThumbRX / 32767.f) * fTimeEl * fAccelerationYaw;
+			s_fYaw = fmod(s_fYaw, XM_2PI);
+			s_fPitch = ((float)sState.Gamepad.sThumbRY / 32767.f) * XM_PIDIV2;
+		}
+
+		// word view projection
 		XMFLOAT4X4 sWorld, sView, sProj;
 		XMStoreFloat4x4(&sWorld, XMMatrixIdentity());
 		XMMATRIX sP = XMMatrixPerspectiveFovLH(0.25f * XM_PI, static_cast<float>(m_sClientSize.nW) / static_cast<float>(m_sClientSize.nH), 1.0f, 1000.0f);
 		XMStoreFloat4x4(&sProj, sP);
-
-		// Spherical to Cartesian
-		float x = fRadius * sinf(fPhi) * cosf(fTheta);
-		float z = fRadius * sinf(fPhi) * sinf(fTheta);
-		float y = fRadius * cosf(fPhi);
-
-		// build view
-		XMVECTOR sPos = XMVectorSet(x, y, z, 1.0f);
-		XMVECTOR sTarget = XMVectorZero();
-		XMVECTOR sUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-		XMMATRIX sV = XMMatrixLookAtLH(sPos, sTarget, sUp);
+		
+		// add velo, translate, decelerate		
+		s_sPos = s_sPos + s_sVelo;
+		XMMATRIX sV =
+			XMMatrixTranslation(-s_sPos.x, -s_sPos.y, -s_sPos.z) *
+			XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), s_fYaw) *
+			XMMatrixRotationAxis(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), s_fPitch);
 		XMStoreFloat4x4(&sView, sV);
+		s_sVelo = s_sVelo * fDeceleration;
 
 		XMMATRIX sW = XMLoadFloat4x4(&sWorld);
 		XMMATRIX sPr = XMLoadFloat4x4(&sProj);
@@ -314,6 +347,8 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		memcpy(&ptData[0], &sConstants, sizeof(ConstantsScene));
 		if (m_sD3D.psBufferUp != nullptr) m_sD3D.psBufferUp->Unmap(0, nullptr);
 	}
+
+	s_fTimeOld = sData.fTotal;
 
 	return APP_FORWARD;
 }
@@ -869,7 +904,7 @@ signed App_D3D12::BuildGeometry()
 		}
 
 		// get handle
-		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv] = 
+		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv] =
 			CD3DX12_CPU_DESCRIPTOR_HANDLE(m_sD3D.psHeapSRV->GetCPUDescriptorHandleForHeapStart(), (uint)CbvSrvUav_Heap_Idc::TileOffsetSrv, m_sD3D.uCbvSrvUavDcSz);
 		m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv] =
 			CD3DX12_GPU_DESCRIPTOR_HANDLE(m_sD3D.psHeapSRV->GetGPUDescriptorHandleForHeapStart(), (uint)CbvSrvUav_Heap_Idc::TileOffsetSrv, m_sD3D.uCbvSrvUavDcSz);
@@ -883,10 +918,10 @@ signed App_D3D12::BuildGeometry()
 		sSrvDc.Buffer = { 0, uInstN, uElementSz, D3D12_BUFFER_SRV_FLAG_NONE };
 		CD3DX12_CPU_DESCRIPTOR_HANDLE sSrvHeapHandle(m_sD3D.psHeapRTV->GetCPUDescriptorHandleForHeapStart());
 		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psTileLayout.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
-	}
+		}
 
 	return APP_FORWARD;
-}
+	}
 
 /// <summary>D3DCompileFromFile wrapper</summary>
 signed App_D3D12::CompileFromFile(

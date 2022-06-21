@@ -43,8 +43,8 @@ float3 graduate(float3 fV, float fR)
 float4 main(in In sIn) : SV_Target
 {
 	// compute terrain texture.. we later move that to the compute shader
-	// float2 sUV = sIn.sUvPos.xz; 
-	float2 sUV = float2(sIn.sUvPos.x + (sTime.x * 20.), sIn.sUvPos.z);
+	float2 sUV = sIn.sUvPos.xz; 
+	// float2 sUV = float2(sIn.sUvPos.x + (sTime.x * 20.), sIn.sUvPos.z);
 	float fFbmScale = .05f;
 	float3 afHeight = fbm(sUV * fFbmScale, 1.);
 

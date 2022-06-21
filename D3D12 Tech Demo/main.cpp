@@ -5,7 +5,7 @@
 
 #include "app_TechDemo.h"
 
-#ifdef _WIN32
+#ifdef _WIN64
 /// <summary>
 /// Windows main entry point.
 /// </summary>

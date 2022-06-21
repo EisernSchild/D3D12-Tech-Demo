@@ -6,7 +6,7 @@
 #ifndef _APP_GFX_CONSTANTS
 #define _APP_GFX_CONSTANTS
 
-#ifdef _WIN32
+#ifdef _WIN64
 #define APP_GfxLib App_D3D12
 #define GfxLib_D3D12
 #include <windows.h>

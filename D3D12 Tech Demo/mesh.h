@@ -5,7 +5,7 @@
 
 #include "const_3D.h"
 
-#ifdef _WIN32
+#ifdef _WIN64
 
 /// <summary>mesh parent class</summary>
 template <typename T>

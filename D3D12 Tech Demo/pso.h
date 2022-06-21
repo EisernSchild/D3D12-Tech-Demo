@@ -6,7 +6,7 @@
 #include "const_3D.h"
 #include <array>
 
-#ifdef _WIN32
+#ifdef _WIN64
 
 /// <summary>
 /// Wrapped pipeline state object
@@ -70,4 +70,4 @@ private:
 	ComPtr<ID3D12PipelineState> m_psPSO = nullptr;
 };
 
-#endif // _WIN32
+#endif // _WIN64

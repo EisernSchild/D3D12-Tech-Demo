@@ -58,8 +58,8 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 	float3 sPosL = sIn.sPosL + float3(sInstOffset.x, 0., sInstOffset.y);
 
 	// compute terrain.. we later move that to the compute shader
-	// float2 sUV = sPosL.xz;
-	float2 sUV = float2(sPosL.x + (sTime.x * 20.), sPosL.z);
+	float2 sUV = sPosL.xz;
+	// float2 sUV = float2(sPosL.x + (sTime.x * 20.), sPosL.z);
 	const float2 afFbmScale = float2(.05f, 10.f);
 	float3 afHeight = fbm(sUV * afFbmScale.x, 1.)* afFbmScale.y;
 	sPosL.y = afHeight.x;
