@@ -9,6 +9,16 @@ HWND App_Windows::m_pHwnd = nullptr;
 App_Windows::Client App_Windows::m_sClientSize;
 App_D3D12::D3D12_Fields App_D3D12::m_sD3D;
 
+XMFLOAT2 operator+(const XMFLOAT2& sSummand0, const XMFLOAT2& sSummand1) {
+	return XMFLOAT2(sSummand0.x + sSummand1.x, sSummand0.y + sSummand1.y);
+}
+XMFLOAT2 operator*(const XMFLOAT2& sMultiplier, const XMFLOAT2& sMultiplicant) {
+	return XMFLOAT2(sMultiplier.x * sMultiplicant.x, sMultiplier.y * sMultiplicant.y);
+}
+XMFLOAT2 operator*(const XMFLOAT2& sMultiplier, const float& fMultiplicant) {
+	return XMFLOAT2(sMultiplier.x * fMultiplicant, sMultiplier.y * fMultiplicant);
+}
+
 signed App_D3D12::GxInit(AppData& sData)
 {
 	OutputDebugStringA("App_D3D12::GxInit");
@@ -252,9 +262,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		const float fRadius = 10.f * (float)abs(sin((double)sData.fTotal * 2.1f)) + 40.f;
 		const float fTheta = 1.5f * XM_PI;
 		const float fPhi = XM_PIDIV4;
-		// const float fTheta = fmod(sData.fTotal, XM_2PI);
-		// const float fPhi = (float)abs(cos((double)sData.fTotal * 1.5f));
-
+		
 		// meanwhile compute here
 		XMFLOAT4X4 sWorld, sView, sProj;
 		XMStoreFloat4x4(&sWorld, XMMatrixIdentity());
@@ -262,7 +270,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		XMStoreFloat4x4(&sProj, sP);
 
 		// Spherical to Cartesian
-		float x = fRadius * sinf(fPhi)* cosf(fTheta);
+		float x = fRadius * sinf(fPhi) * cosf(fTheta);
 		float z = fRadius * sinf(fPhi) * sinf(fTheta);
 		float y = fRadius * cosf(fPhi);
 
@@ -294,7 +302,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		XMStoreFloat4(&sConstants.sViewport, sViewport);
 	}
 
-	/// mouse (x - x position, y - y position, z - buttons (unsigned), w - wheel (unsigned))
+	/// mouse (x - x position, y - y position, z - buttons (uint), w - wheel (uint))
 	{
 		///...	
 	}
@@ -340,7 +348,7 @@ signed App_D3D12::Draw(const AppData& sData)
 	m_sD3D.psCmdList->OMSetRenderTargets(1, &sRtvHandle, true, &sDsvHandle);
 
 	// descriptor heaps, root signature
-	ID3D12DescriptorHeap* apsDHeaps[] = { m_sD3D.psConstSRV.Get() };
+	ID3D12DescriptorHeap* apsDHeaps[] = { m_sD3D.psHeapSRV.Get() };
 	m_sD3D.psCmdList->SetDescriptorHeaps(_countof(apsDHeaps), apsDHeaps);
 	m_sD3D.psCmdList->SetGraphicsRootSignature(m_sD3D.psRootSign.Get());
 
@@ -350,7 +358,8 @@ signed App_D3D12::Draw(const AppData& sData)
 	m_sD3D.psCmdList->IASetVertexBuffers(0, 1, &sVBV);
 	m_sD3D.psCmdList->IASetIndexBuffer(&sIBV);
 	m_sD3D.psCmdList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(0, m_sD3D.psConstSRV->GetGPUDescriptorHandleForHeapStart());
+	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(0, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::SceneConstants]);
+	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(1, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
 	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), m_sD3D.pcHexMesh->Instances_N(), 0, 0, 0);
 
 	// execute post processing
@@ -394,13 +403,13 @@ void App_D3D12::ExecutePostProcessing(ID3D12GraphicsCommandList* psCmdList,
 	// set root sign, shader inputs
 	psCmdList->SetComputeRootSignature(psRootSign);
 	psCmdList->SetPipelineState(psPSO);
-	psCmdList->SetComputeRootDescriptorTable(0, m_sD3D.psConstSRV->GetGPUDescriptorHandleForHeapStart());
-	psCmdList->SetComputeRootDescriptorTable(1, m_sD3D.asPostGpuH[0]);
-	psCmdList->SetComputeRootDescriptorTable(2, m_sD3D.asPostGpuH[3]);
+	psCmdList->SetComputeRootDescriptorTable(0, m_sD3D.psHeapSRV->GetGPUDescriptorHandleForHeapStart());
+	psCmdList->SetComputeRootDescriptorTable(1, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::PostMap0Srv]);
+	psCmdList->SetComputeRootDescriptorTable(2, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::PostMap1Uav]);
 
 	// dispatch (x * 256 (N in compute shader))
 	UINT uNumGroupsX = (UINT)ceilf(static_cast<float>(m_sClientSize.nW) / 256.0f);
-	psCmdList->Dispatch(uNumGroupsX, (unsigned)m_sClientSize.nH, 1);
+	psCmdList->Dispatch(uNumGroupsX, (uint)m_sClientSize.nH, 1);
 
 	// transit second map to generic read
 	CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, m_sD3D.psPostMap1.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_GENERIC_READ);
@@ -413,9 +422,13 @@ signed App_D3D12::CreateSceneDHeaps()
 		const int nConstantsDcN = 1;
 		const int nPostDcN = 4;
 
-		D3D12_DESCRIPTOR_HEAP_DESC sCbvHeapDesc = { D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, nConstantsDcN + nPostDcN, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0 };
-		ThrowIfFailed(m_sD3D.psDevice->CreateDescriptorHeap(&sCbvHeapDesc, IID_PPV_ARGS(m_sD3D.psConstSRV.ReleaseAndGetAddressOf())));
-		m_sD3D.psConstSRV->SetName(L"constant SRV heap");
+		D3D12_DESCRIPTOR_HEAP_DESC sCbvHeapDesc = { D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, nConstantsDcN + nPostDcN + 1, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0 };
+		ThrowIfFailed(m_sD3D.psDevice->CreateDescriptorHeap(&sCbvHeapDesc, IID_PPV_ARGS(m_sD3D.psHeapSRV.ReleaseAndGetAddressOf())));
+		m_sD3D.psHeapSRV->SetName(L"constant SRV heap");
+
+		// set handles for scene constant buffer
+		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::SceneConstants] = m_sD3D.psHeapSRV->GetCPUDescriptorHandleForHeapStart();
+		m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::SceneConstants] = m_sD3D.psHeapSRV->GetGPUDescriptorHandleForHeapStart();
 	}
 	// sampler setup
 	{
@@ -450,7 +463,7 @@ signed App_D3D12::CreateConstantBuffers()
 	D3D12_CONSTANT_BUFFER_VIEW_DESC sCbvDesc;
 	sCbvDesc.BufferLocation = uAddress;
 	sCbvDesc.SizeInBytes = Align8Bit(sizeof(ConstantsScene));
-	m_sD3D.psDevice->CreateConstantBufferView(&sCbvDesc, m_sD3D.psConstSRV->GetCPUDescriptorHandleForHeapStart());
+	m_sD3D.psDevice->CreateConstantBufferView(&sCbvDesc, m_sD3D.psHeapSRV->GetCPUDescriptorHandleForHeapStart());
 
 	return APP_FORWARD;
 }
@@ -463,12 +476,16 @@ signed App_D3D12::CreateRootSignatures()
 		CD3DX12_DESCRIPTOR_RANGE sCbvTable;
 		sCbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 
+		CD3DX12_DESCRIPTOR_RANGE sSrvTable;
+		sSrvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+
 		// param
-		CD3DX12_ROOT_PARAMETER sSlotRootPrm[1];
-		sSlotRootPrm[0].InitAsDescriptorTable(1, &sCbvTable);
+		CD3DX12_ROOT_PARAMETER asSlotRootPrm[6];
+		asSlotRootPrm[0].InitAsDescriptorTable(1, &sCbvTable);
+		asSlotRootPrm[1].InitAsDescriptorTable(1, &sSrvTable);
 
 		// description
-		CD3DX12_ROOT_SIGNATURE_DESC sRootSigDc(1, sSlotRootPrm, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		CD3DX12_ROOT_SIGNATURE_DESC sRootSigDc(2, asSlotRootPrm, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		// serialize
 		ComPtr<ID3DBlob> psRootSig = nullptr;
@@ -591,8 +608,8 @@ signed App_D3D12::CreateTextures()
 		D3D12_RESOURCE_DESC sTexDc = {
 			D3D12_RESOURCE_DIMENSION_TEXTURE2D,
 			0,
-			(unsigned)m_sClientSize.nW,
-			(unsigned)m_sClientSize.nH,
+			(uint)m_sClientSize.nW,
+			(uint)m_sClientSize.nH,
 			1,
 			1,
 			m_sD3D.eBackbufferFmt,
@@ -622,12 +639,16 @@ signed App_D3D12::CreateTextures()
 	// and views
 	{
 		// set handles
-		CD3DX12_CPU_DESCRIPTOR_HANDLE sCpuDc = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_sD3D.psConstSRV->GetCPUDescriptorHandleForHeapStart(), 1, m_sD3D.uCbvSrvUavDcSz);
-		CD3DX12_GPU_DESCRIPTOR_HANDLE sGpuDc = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_sD3D.psConstSRV->GetGPUDescriptorHandleForHeapStart(), 1, m_sD3D.uCbvSrvUavDcSz);
-		m_sD3D.asPostCpuH[0] = sCpuDc;
-		for (signed nI : { 1, 2, 3}) m_sD3D.asPostCpuH[nI] = sCpuDc.Offset(1, m_sD3D.uCbvSrvUavDcSz);
-		m_sD3D.asPostGpuH[0] = sGpuDc;
-		for (signed nI : { 1, 2, 3}) m_sD3D.asPostGpuH[nI] = sGpuDc.Offset(1, m_sD3D.uCbvSrvUavDcSz);
+		CD3DX12_CPU_DESCRIPTOR_HANDLE sCpuDc = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_sD3D.psHeapSRV->GetCPUDescriptorHandleForHeapStart(), 1, m_sD3D.uCbvSrvUavDcSz);
+		CD3DX12_GPU_DESCRIPTOR_HANDLE sGpuDc = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_sD3D.psHeapSRV->GetGPUDescriptorHandleForHeapStart(), 1, m_sD3D.uCbvSrvUavDcSz);
+		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::PostMap0Srv] = sCpuDc;
+		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::PostMap0Uav] = sCpuDc.Offset(1, m_sD3D.uCbvSrvUavDcSz);
+		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::PostMap1Srv] = sCpuDc.Offset(1, m_sD3D.uCbvSrvUavDcSz);
+		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::PostMap1Uav] = sCpuDc.Offset(1, m_sD3D.uCbvSrvUavDcSz);
+		m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::PostMap0Srv] = sGpuDc;
+		m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::PostMap0Uav] = sGpuDc.Offset(1, m_sD3D.uCbvSrvUavDcSz);
+		m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::PostMap1Srv] = sGpuDc.Offset(1, m_sD3D.uCbvSrvUavDcSz);
+		m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::PostMap1Uav] = sGpuDc.Offset(1, m_sD3D.uCbvSrvUavDcSz);
 
 		// create SRVs, UAVs
 		D3D12_SHADER_RESOURCE_VIEW_DESC sSrvDc = {
@@ -642,11 +663,11 @@ signed App_D3D12::CreateTextures()
 			D3D12_UAV_DIMENSION_TEXTURE2D, {}
 		};
 
-		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psPostMap0.Get(), &sSrvDc, m_sD3D.asPostCpuH[0]);
-		m_sD3D.psDevice->CreateUnorderedAccessView(m_sD3D.psPostMap0.Get(), nullptr, &sUavDc, m_sD3D.asPostCpuH[1]);
+		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psPostMap0.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::PostMap0Srv]);
+		m_sD3D.psDevice->CreateUnorderedAccessView(m_sD3D.psPostMap0.Get(), nullptr, &sUavDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::PostMap0Uav]);
 
-		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psPostMap1.Get(), &sSrvDc, m_sD3D.asPostCpuH[2]);
-		m_sD3D.psDevice->CreateUnorderedAccessView(m_sD3D.psPostMap1.Get(), nullptr, &sUavDc, m_sD3D.asPostCpuH[3]);
+		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psPostMap1.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::PostMap1Srv]);
+		m_sD3D.psDevice->CreateUnorderedAccessView(m_sD3D.psPostMap1.Get(), nullptr, &sUavDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::PostMap1Uav]);
 	}
 
 	return APP_FORWARD;
@@ -654,6 +675,11 @@ signed App_D3D12::CreateTextures()
 
 signed App_D3D12::BuildGeometry()
 {
+	/// <summary>number of hex ambits (or "circles") around the main hexagon</summary>
+	const unsigned uAmbitN = 16;
+	/// <summary>number of hex tiles (or instances), to be computed</summary>
+	unsigned uInstN = 1;
+
 	// base hexagon
 	{
 		// create basic hexagon with 6 triangles
@@ -750,10 +776,7 @@ signed App_D3D12::BuildGeometry()
 		std::vector<VertexPosCol> asHexagonVtc;
 		for (XMFLOAT3& sV : asHexVtc)
 		{
-			// color values : 
-			// xy - local position
-			// z - distance to mesh center
-			// w - normalized distance to mesh center ( = hexagon )
+			// color values : xy - local position; z - distance to mesh center; w - normalized distance to mesh center ( = hexagon )
 			XMFLOAT4 sCol = { sV.x, sV.z, sqrt(sV.x * sV.x + sV.z * sV.z), sV.y };
 
 			// sV.y (preliminary normalized dist) to zero
@@ -762,9 +785,6 @@ signed App_D3D12::BuildGeometry()
 			asHexagonVtc.push_back({ sV, sCol });
 		}
 
-		// number of hex ambits (or "circles") around the main hexagon
-		const unsigned uAmbitN = 32;
-		unsigned uInstN = 1;
 		unsigned uAmbitTileN = 6;
 		for (unsigned uI(0); uI < uAmbitN; uI++)
 		{
@@ -773,7 +793,98 @@ signed App_D3D12::BuildGeometry()
 		}
 		m_sD3D.pcHexMesh = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, uInstN, "hexagon");
 	}
-	
+
+	// create a hex tile offset buffer (containing the xy positions of the tiles (float2))
+	{
+		const unsigned uElementSz = sizeof(float) * 2;
+		D3D12_RESOURCE_DESC sBufDc = {
+			D3D12_RESOURCE_DIMENSION_BUFFER,
+			0,
+			Align8Bit(uInstN * uElementSz),
+			1,
+			1,
+			1,
+			DXGI_FORMAT_UNKNOWN,
+			{ 1, 0 },
+			D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+			D3D12_RESOURCE_FLAG_NONE
+		};
+
+		// create buffer and upload buffer
+		CD3DX12_HEAP_PROPERTIES sPrps(D3D12_HEAP_TYPE_DEFAULT);
+		ThrowIfFailed(m_sD3D.psDevice->CreateCommittedResource(
+			&sPrps,
+			D3D12_HEAP_FLAG_NONE,
+			&sBufDc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(m_sD3D.psTileLayout.ReleaseAndGetAddressOf())));
+		sPrps.Type = D3D12_HEAP_TYPE_UPLOAD;
+		ThrowIfFailed(m_sD3D.psDevice->CreateCommittedResource(
+			&sPrps,
+			D3D12_HEAP_FLAG_NONE,
+			&sBufDc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(m_sD3D.psTileLayoutUp.ReleaseAndGetAddressOf())));
+
+		// create the tile offsets, const tile size 1.f
+		const float fS = 1.f;
+		std::vector<XMFLOAT2> aafPos;
+		for (unsigned uInstIx(0); uInstIx < Align8Bit(uInstN); uInstIx++)
+		{
+			XMFLOAT2 sInstOffset = XMFLOAT2{ 0.f, 0.f };
+			if (uInstIx > 0)
+			{
+				unsigned uMul = (uInstIx - 1) / 6;
+				unsigned uOffset = (uInstIx - 1) % 6;
+
+				// get the ambit (TODO find a more elegant way here...)
+				unsigned uAmTN = 6;
+				unsigned uAmbit = 1;
+				unsigned uIx = (uInstIx - 1);
+				while (uAmTN <= uIx)
+				{
+					uIx -= uAmTN;
+					uAmTN += 6;
+					uAmbit++;
+				}
+
+				// move
+				sInstOffset = to_next_field(fS, uOffset) * (float)uAmbit;
+				if (uIx > uOffset)
+					sInstOffset = sInstOffset + to_next_field(fS, uOffset + 2) * (float)(uIx / 6);
+			}
+			aafPos.push_back(sInstOffset);
+		}
+
+		// update the constant buffer for the tils offsets
+		{
+			D3D12_SUBRESOURCE_DATA sSubData = { aafPos.data(), (LONG_PTR)(aafPos.size() * uElementSz), (LONG_PTR)(aafPos.size() * uElementSz) };
+			const CD3DX12_RB_TRANSITION sResBr(m_sD3D.psTileLayout.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+
+			// schedule update to command list
+			UpdateSubresources<1>(m_sD3D.psCmdList.Get(), m_sD3D.psTileLayout.Get(), m_sD3D.psTileLayoutUp.Get(), 0, 0, 1, &sSubData);
+			m_sD3D.psCmdList->ResourceBarrier(1, &sResBr);
+		}
+
+		// get handle
+		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv] = 
+			CD3DX12_CPU_DESCRIPTOR_HANDLE(m_sD3D.psHeapSRV->GetCPUDescriptorHandleForHeapStart(), (uint)CbvSrvUav_Heap_Idc::TileOffsetSrv, m_sD3D.uCbvSrvUavDcSz);
+		m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv] =
+			CD3DX12_GPU_DESCRIPTOR_HANDLE(m_sD3D.psHeapSRV->GetGPUDescriptorHandleForHeapStart(), (uint)CbvSrvUav_Heap_Idc::TileOffsetSrv, m_sD3D.uCbvSrvUavDcSz);
+
+		// create SRV
+		D3D12_SHADER_RESOURCE_VIEW_DESC sSrvDc = {
+			DXGI_FORMAT_UNKNOWN,
+			D3D12_SRV_DIMENSION_BUFFER,
+			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING, {}
+		};
+		sSrvDc.Buffer = { 0, uInstN, uElementSz, D3D12_BUFFER_SRV_FLAG_NONE };
+		CD3DX12_CPU_DESCRIPTOR_HANDLE sSrvHeapHandle(m_sD3D.psHeapRTV->GetCPUDescriptorHandleForHeapStart());
+		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psTileLayout.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
+	}
+
 	return APP_FORWARD;
 }
 

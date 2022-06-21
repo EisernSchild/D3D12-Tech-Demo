@@ -14,7 +14,7 @@ cbuffer sScene : register(b0)
 	float4 sTime;
 	/// viewport (x - topLeftX, y - topLeftY, z - width, w - height)
 	float4 sViewport;
-	/// mouse (x - x position, y - y position, z - buttons (unsigned), w - wheel (unsigned))
+	/// mouse (x - x position, y - y position, z - buttons (uint), w - wheel (uint))
 	float4 sMouse;
 };
 

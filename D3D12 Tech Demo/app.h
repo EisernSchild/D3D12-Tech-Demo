@@ -12,6 +12,11 @@
 #include <future>
 #include <array>
 
+typedef unsigned uint;
+typedef struct { float x, y; } float2;
+typedef struct { float x, y, z; } float3;
+typedef struct { float x, y, z, w; } float4;
+
 constexpr std::wstring_view s_atAppname = L"D3D12 Tech Demo";
 
 #ifdef _WIN32

@@ -26,6 +26,22 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
+// provide one of 6 hexagonal corner points
+inline XMFLOAT2 hex_corner(float fSize, uint uI)
+{
+	float fAngle_deg = 60.f * (float)(uI % 6) - 30.f;
+	float fAngle_rad = (XM_PI / 180.f) * fAngle_deg;
+	return XMFLOAT2{ fSize * cos(fAngle_rad), fSize * sin(fAngle_rad) };
+}
+
+// provide vector to neighbour field (index 0..5)
+inline XMFLOAT2 to_next_field(float fSize, uint uI)
+{
+	XMFLOAT2 afC0 = hex_corner(fSize, uI);
+	XMFLOAT2 afC1 = hex_corner(fSize, (uI + 2) % 6);
+	return XMFLOAT2{ afC0.x - afC1.x, afC0.y - afC1.y };
+}
+
 /// <summary>Simple Sample vertex</summary>
 struct VertexPosCol
 {
@@ -46,7 +62,7 @@ struct ConstantsScene
 	XMFLOAT4 sTime;
 	/// <summary>viewport (x - topLeftX, y - topLeftY, z - width, w - height)</summary>
 	XMFLOAT4 sViewport;
-	/// <summary>mouse (x - x position, y - y position, z - buttons (unsigned), w - wheel (unsigned)</summary>
+	/// <summary>mouse (x - x position, y - y position, z - buttons (uint), w - wheel (uint)</summary>
 	XMFLOAT4 sMouse;
 };
 

@@ -14,9 +14,11 @@ cbuffer sScene : register(b0)
 	float4 sTime;
 	/// viewport (x - topLeftX, y - topLeftY, z - width, w - height)
 	float4 sViewport;
-	/// mouse (x - x position, y - y position, z - buttons (unsigned), w - wheel (unsigned))
+	/// mouse (x - x position, y - y position, z - buttons (uint), w - wheel (uint))
 	float4 sMouse;
 };
+
+Buffer<float2> avTilePos : register(t0);
 
 struct In
 {
@@ -50,30 +52,7 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 	Out sOut;
 
 	// get hex tile position
-	// we will later precompute that to 
-	// an array for efficiency
-	float fS = 1.f;
-	float2 sInstOffset = float2(0.f, 0.f);
-	if (uInstIx > 0)
-	{
-		uint uMul = (uInstIx - 1) / 6;
-		uint uOffset = (uInstIx - 1) % 6;
-
-		// get the ambit (TODO find a more elegant way here...)
-		uint uAmTN = 6;
-		uint uAmbit = 1;
-		uint uIx = (uInstIx - 1);
-		while (uAmTN <= uIx)
-		{
-			uIx -= uAmTN;
-			uAmTN += 6;
-			uAmbit++;
-		}
-
-		sInstOffset = to_next_field(fS, uOffset) * uAmbit;
-		if (uIx > uOffset)
-			sInstOffset += to_next_field(fS, uOffset + 2) * (float)(uIx / 6);
-	}
+	float2 sInstOffset = avTilePos[uInstIx];
 
 	// get world position with zero height (y)
 	float3 sPosL = sIn.sPosL + float3(sInstOffset.x, 0., sInstOffset.y);
@@ -82,7 +61,7 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 	// float2 sUV = sPosL.xz;
 	float2 sUV = float2(sPosL.x + (sTime.x * 20.), sPosL.z);
 	const float2 afFbmScale = float2(.05f, 10.f);
-	float3 afHeight = fbm(sUV * afFbmScale.x, 1.) * afFbmScale.y;
+	float3 afHeight = fbm(sUV * afFbmScale.x, 1.)* afFbmScale.y;
 	sPosL.y = afHeight.x;
 
 	// transform to homogeneous clip space, pass color

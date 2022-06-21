@@ -93,7 +93,7 @@ protected:
 		/// <summary>shaders root signature</summary>
 		ComPtr<ID3D12RootSignature> psRootSign = nullptr;
 		/// <summary>constant buffer view descriptor heap</summary>
-		ComPtr<ID3D12DescriptorHeap> psConstSRV = nullptr;
+		ComPtr<ID3D12DescriptorHeap> psHeapSRV = nullptr;
 		/// <summary>sampler state descriptor heap</summary>
 		ComPtr<ID3D12DescriptorHeap> psSampler = nullptr;
 		/// <summary>shader constants upload buffer</summary>
@@ -126,13 +126,27 @@ protected:
 		ComPtr<ID3D12RootSignature> psRootSignCS = nullptr;
 		/// <summary>Main render target post processing buffers</summary>
 		ComPtr<ID3D12Resource> psPostMap0 = nullptr, psPostMap1 = nullptr;
-		/// <summary>GPU descriptor handles for post processing</summary>
-		std::array<CD3DX12_GPU_DESCRIPTOR_HANDLE, 4> asPostGpuH;
-		/// <summary>CPU descriptor handles for post processing</summary>
-		std::array<CD3DX12_CPU_DESCRIPTOR_HANDLE, 4> asPostCpuH;
+		/// <summary>Buffer containing the terrain (hex) tiles xy position + upload buffer</summary>
+		ComPtr<ID3D12Resource> psTileLayout = nullptr, psTileLayoutUp = nullptr;
+		/// <summary>all resource view handles (GPU), enumerated in CbvSrvUav_Heap_Idc</summary>
+		std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> asCbvSrvUavGpuH = std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE>(uSrvN);
+		/// <summary>all resource view handles (CPU), enumerated in CbvSrvUav_Heap_Idc</summary>
+		std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> asCbvSrvUavCpuH = std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE>(uSrvN);
 	} m_sD3D;
 
 private:
+
+	/// <summary>Shader resource view heap continous enumeration</summary>
+	enum struct CbvSrvUav_Heap_Idc : unsigned
+	{
+		SceneConstants = 0,
+		PostMap0Srv = 1,
+		PostMap0Uav = 2,
+		PostMap1Srv = 3,
+		PostMap1Uav = 4,
+		TileOffsetSrv = 5
+	};
+	static constexpr unsigned uSrvN = 7;
 
 	/// <summary>D3DCompileFromFile wrapper</summary>
 	static signed CompileFromFile(
