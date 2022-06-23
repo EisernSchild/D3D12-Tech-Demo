@@ -1,5 +1,5 @@
-// D3D12 Tech Demo
-// Copyright � 2022 by Denis Reischl
+﻿// D3D12 Tech Demo
+// Copyright © 2022 by Denis Reischl
 // 
 // SPDX-License-Identifier: MIT
 
@@ -8,6 +8,7 @@
 HWND App_Windows::m_pHwnd = nullptr;
 App_Windows::Client App_Windows::m_sClientSize;
 App_D3D12::D3D12_Fields App_D3D12::m_sD3D;
+App_D3D12::SceneData App_D3D12::m_sScene;
 
 XMFLOAT2 operator+(const XMFLOAT2& sSummand0, const XMFLOAT2& sSummand1) {
 	return XMFLOAT2(sSummand0.x + sSummand1.x, sSummand0.y + sSummand1.y);
@@ -267,37 +268,28 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	ConstantsScene sConstants = {};
 	static float s_fTimeOld = 0.f;
 	float fTimeEl = sData.fTotal - s_fTimeOld;
-		
+
 	/// world - view - projection
 	{
-		static XMFLOAT3 s_sPos = XMFLOAT3(0.f, 10.f, 0.f);
-		static XMFLOAT3 s_sVelo = XMFLOAT3(0.f, 0.f, 0.f);
-		static XMFLOAT3 s_sTarget = XMFLOAT3();
-		const XMVECTOR sUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-		const float fAcceleration = .1f, fAccelerationYaw = 4.f;
-		const float fDeceleration = .995f;
-		static float s_fYaw = 0.f;
-		static float s_fPitch = 0.f;
-
 		// get controller 0 state
 		XINPUT_STATE sState = {};
 		uint32_t uR = XInputGetState(0, &sState);
 		if (uR == ERROR_SUCCESS)
 		{
 			// position xz
-			float fThX = ((float)sState.Gamepad.sThumbLX / 32767.f) * fTimeEl * fAcceleration;
-			float fThY = ((float)sState.Gamepad.sThumbLY / 32767.f) * fTimeEl * fAcceleration;
-			s_sVelo.x += fThX * cosf(s_fYaw) - fThY * sinf(s_fYaw);
-			s_sVelo.z += fThX * sinf(s_fYaw) + fThY * cosf(s_fYaw);
+			float fThX = ((float)sState.Gamepad.sThumbLX / 32767.f) * fTimeEl * m_sScene.fAccelTran;
+			float fThY = ((float)sState.Gamepad.sThumbLY / 32767.f) * fTimeEl * m_sScene.fAccelTran;
+			m_sScene.sCamVelo.x += fThX * cosf(m_sScene.fYaw) - fThY * sinf(m_sScene.fYaw);
+			m_sScene.sCamVelo.z += fThX * sinf(m_sScene.fYaw) + fThY * cosf(m_sScene.fYaw);
 
 			// height y
-			s_sVelo.y += ((float)sState.Gamepad.bRightTrigger / 256.f) * fTimeEl * fAcceleration;
-			s_sVelo.y -= ((float)sState.Gamepad.bLeftTrigger / 256.f) * fTimeEl * fAcceleration;
+			m_sScene.sCamVelo.y += ((float)sState.Gamepad.bRightTrigger / 256.f) * fTimeEl * m_sScene.fAccelTran;
+			m_sScene.sCamVelo.y -= ((float)sState.Gamepad.bLeftTrigger / 256.f) * fTimeEl * m_sScene.fAccelTran;
 
 			// yaw, pitch
-			s_fYaw -= ((float)sState.Gamepad.sThumbRX / 32767.f) * fTimeEl * fAccelerationYaw;
-			s_fYaw = fmod(s_fYaw, XM_2PI);
-			s_fPitch = ((float)sState.Gamepad.sThumbRY / 32767.f) * XM_PIDIV2;
+			m_sScene.fYaw -= ((float)sState.Gamepad.sThumbRX / 32767.f) * fTimeEl * m_sScene.fAccelRot;
+			m_sScene.fYaw = fmod(m_sScene.fYaw, XM_2PI);
+			m_sScene.fPitch = ((float)sState.Gamepad.sThumbRY / 32767.f) * XM_PIDIV2;
 		}
 
 		// word view projection
@@ -305,21 +297,21 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		XMStoreFloat4x4(&sWorld, XMMatrixIdentity());
 		XMMATRIX sP = XMMatrixPerspectiveFovLH(0.25f * XM_PI, static_cast<float>(m_sClientSize.nW) / static_cast<float>(m_sClientSize.nH), 1.0f, 1000.0f);
 		XMStoreFloat4x4(&sProj, sP);
-		
+
 		// add velo, translate, decelerate		
-		s_sPos = s_sPos + s_sVelo;
+		m_sScene.sCamPos = m_sScene.sCamPos + m_sScene.sCamVelo;
 		XMMATRIX sV =
-			XMMatrixTranslation(-s_sPos.x, -s_sPos.y, -s_sPos.z) *
-			XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), s_fYaw) *
-			XMMatrixRotationAxis(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), s_fPitch);
+			XMMatrixTranslation(-m_sScene.sCamPos.x, -m_sScene.sCamPos.y, -m_sScene.sCamPos.z) *
+			XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), m_sScene.fYaw) *
+			XMMatrixRotationAxis(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), m_sScene.fPitch);
 		XMStoreFloat4x4(&sView, sV);
-		s_sVelo = s_sVelo * fDeceleration;
+		m_sScene.sCamVelo = m_sScene.sCamVelo * m_sScene.fDrag;
 
 		XMMATRIX sW = XMLoadFloat4x4(&sWorld);
 		XMMATRIX sPr = XMLoadFloat4x4(&sProj);
-		XMMATRIX worldViewProj = sW * sV * sPr;
+		XMMATRIX sWVP = sW * sV * sPr;
 
-		XMStoreFloat4x4(&sConstants.sWVP, XMMatrixTranspose(worldViewProj));
+		XMStoreFloat4x4(&sConstants.sWVP, XMMatrixTranspose(sWVP));
 	}
 
 	/// time (x - total, y - delta, z - fps total, w - fps)
@@ -338,6 +330,36 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	/// mouse (x - x position, y - y position, z - buttons (uint), w - wheel (uint))
 	{
 		///...	
+	}
+
+	/// hex uv
+	{
+		// get position xz
+		float fX = m_sScene.sCamPos.x;
+		float fY = m_sScene.sCamPos.z;
+
+		// hex coords       (u, v) = (          .5 * x + .5 * y,        y ) 
+		// hex coord scaled (u, v) = ((sqrt(3.f) * x + y) / 3.f, y / 1.5f )
+		float fU = m_sScene.sHexUV.x = (sqrt(3.f) * fX + fY) / 3.f;
+		float fV = m_sScene.sHexUV.y = fY / 1.5f;
+
+		// get rounded uv = hex center (not fully mathematically correct but enough for our purpose)
+		float fUc = m_sScene.sHexUVc.x = round(fU);
+		float fVc = m_sScene.sHexUVc.y = round(fV);
+
+		// get cartesian hex center
+		fX = m_sScene.sHexXYc.x = (fUc * 3.f - fVc * 1.5f) / sqrt(3.f);
+		fY = m_sScene.sHexXYc.y = fVc * 1.5f;
+
+		// store to constants
+		XMVECTOR sUV = XMVectorSet(fX, fY, fU, fV);
+		XMStoreFloat4(&sConstants.sHexUV, sUV);
+
+		// loop through tiles by index
+		for (unsigned uIx(0); uIx < (unsigned)m_sScene.aafTilePos.size(); uIx++)
+		{
+
+		}
 	}
 
 	// and update
@@ -710,11 +732,6 @@ signed App_D3D12::CreateTextures()
 
 signed App_D3D12::BuildGeometry()
 {
-	/// <summary>number of hex ambits (or "circles") around the main hexagon</summary>
-	const unsigned uAmbitN = 16;
-	/// <summary>number of hex tiles (or instances), to be computed</summary>
-	unsigned uInstN = 1;
-
 	// base hexagon
 	{
 		// create basic hexagon with 6 triangles
@@ -821,12 +838,12 @@ signed App_D3D12::BuildGeometry()
 		}
 
 		unsigned uAmbitTileN = 6;
-		for (unsigned uI(0); uI < uAmbitN; uI++)
+		for (unsigned uI(0); uI < m_sScene.uAmbitN; uI++)
 		{
-			uInstN += uAmbitTileN;
+			m_sScene.uInstN += uAmbitTileN;
 			uAmbitTileN += 6;
 		}
-		m_sD3D.pcHexMesh = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, uInstN, "hexagon");
+		m_sD3D.pcHexMesh = std::make_unique<Mesh_PosCol>(m_sD3D.psDevice.Get(), m_sD3D.psCmdList.Get(), asHexagonVtc, auHexIdc, m_sScene.uInstN, "hexagon");
 	}
 
 	// create a hex tile offset buffer (containing the xy positions of the tiles (float2))
@@ -835,7 +852,7 @@ signed App_D3D12::BuildGeometry()
 		D3D12_RESOURCE_DESC sBufDc = {
 			D3D12_RESOURCE_DIMENSION_BUFFER,
 			0,
-			Align8Bit(uInstN * uElementSz),
+			Align8Bit(m_sScene.uInstN * uElementSz),
 			1,
 			1,
 			1,
@@ -864,9 +881,7 @@ signed App_D3D12::BuildGeometry()
 			IID_PPV_ARGS(m_sD3D.psTileLayoutUp.ReleaseAndGetAddressOf())));
 
 		// create the tile offsets, const tile size 1.f
-		const float fS = 1.f;
-		std::vector<XMFLOAT2> aafPos;
-		for (unsigned uInstIx(0); uInstIx < Align8Bit(uInstN); uInstIx++)
+		for (unsigned uInstIx(0); uInstIx < Align8Bit(m_sScene.uInstN); uInstIx++)
 		{
 			XMFLOAT2 sInstOffset = XMFLOAT2{ 0.f, 0.f };
 			if (uInstIx > 0)
@@ -886,16 +901,16 @@ signed App_D3D12::BuildGeometry()
 				}
 
 				// move
-				sInstOffset = to_next_field(fS, uOffset) * (float)uAmbit;
+				sInstOffset = to_next_field(m_sScene.fTileSize, uOffset) * (float)uAmbit;
 				if (uIx > uOffset)
-					sInstOffset = sInstOffset + to_next_field(fS, uOffset + 2) * (float)(uIx / 6);
+					sInstOffset = sInstOffset + to_next_field(m_sScene.fTileSize, uOffset + 2) * (float)(uIx / 6);
 			}
-			aafPos.push_back(sInstOffset);
+			m_sScene.aafTilePos.push_back(sInstOffset);
 		}
 
 		// update the constant buffer for the tils offsets
 		{
-			D3D12_SUBRESOURCE_DATA sSubData = { aafPos.data(), (LONG_PTR)(aafPos.size() * uElementSz), (LONG_PTR)(aafPos.size() * uElementSz) };
+			D3D12_SUBRESOURCE_DATA sSubData = { m_sScene.aafTilePos.data(), (LONG_PTR)(m_sScene.aafTilePos.size() * uElementSz), (LONG_PTR)(m_sScene.aafTilePos.size() * uElementSz) };
 			const CD3DX12_RB_TRANSITION sResBr(m_sD3D.psTileLayout.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
 
 			// schedule update to command list
@@ -915,13 +930,13 @@ signed App_D3D12::BuildGeometry()
 			D3D12_SRV_DIMENSION_BUFFER,
 			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING, {}
 		};
-		sSrvDc.Buffer = { 0, uInstN, uElementSz, D3D12_BUFFER_SRV_FLAG_NONE };
+		sSrvDc.Buffer = { 0, m_sScene.uInstN, uElementSz, D3D12_BUFFER_SRV_FLAG_NONE };
 		CD3DX12_CPU_DESCRIPTOR_HANDLE sSrvHeapHandle(m_sD3D.psHeapRTV->GetCPUDescriptorHandleForHeapStart());
 		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psTileLayout.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
-		}
+	}
 
 	return APP_FORWARD;
-	}
+}
 
 /// <summary>D3DCompileFromFile wrapper</summary>
 signed App_D3D12::CompileFromFile(

@@ -64,6 +64,8 @@ struct ConstantsScene
 	XMFLOAT4 sViewport;
 	/// <summary>mouse (x - x position, y - y position, z - buttons (uint), w - wheel (uint)</summary>
 	XMFLOAT4 sMouse;
+	/// <summary>hexagonal uv (x - x cartesian center, y - y cartesian center, z - u center, w - v center)</summary>
+	XMFLOAT4 sHexUV;
 };
 
 /// <summary>round up to nearest multiple of 256</summary>

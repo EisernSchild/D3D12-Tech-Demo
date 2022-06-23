@@ -45,7 +45,7 @@ protected:
 	static signed CreateMainDHeaps();
 	/// <summary>Create depth stencil, viewport</summary>
 	static signed OnResize();
-	/// <summary>Update Constants helper</summary>
+	/// <summary>Update constants</summary>
 	static signed UpdateConstants(const AppData& sData);
 	/// <summary>First draw test function</summary>
 	static signed Draw(const AppData& sData);
@@ -132,6 +132,36 @@ protected:
 		/// <summary>all resource view handles (CPU), enumerated in CbvSrvUav_Heap_Idc</summary>
 		std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> asCbvSrvUavCpuH = std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE>(uSrvN);
 	} m_sD3D;
+
+	static struct SceneData 
+	{
+		/// <summary>camera position</summary>
+		XMFLOAT3 sCamPos = XMFLOAT3(0.f, 10.f, 0.f);
+		/// <summary>camera velocity</summary>
+		XMFLOAT3 sCamVelo = {};
+		/// <summary>hexagonal coordinates (camera)</summary>
+		XMFLOAT2 sHexUV = {};
+		/// <summary>hexagonal coordinates next tile center (camera)</summary>
+		XMFLOAT2 sHexUVc = {};
+		/// <summary>hexagonal coordinates next tile center cardesian (camera)</summary>
+		XMFLOAT2 sHexXYc = {};
+		/// <summary>constant up vector</summary>
+		const XMVECTOR sUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+		/// <summary>acceleration for translation and rotation</summary>
+		const float fAccelTran = .1f, fAccelRot = 4.f;
+		/// <summary>resistance to velocity</summary>
+		const float fDrag = .995f;
+		/// <summary>camera pitch, yaw</summary>
+		float fYaw = 0.f, fPitch = 0.f;
+		/// <summary>number of hex ambits (or "circles") around the main hexagon</summary>
+		const unsigned uAmbitN = 16;
+		/// <summary>number of hex tiles (or instances), to be computed</summary>
+		unsigned uInstN = 1;
+		/// <summary>hex tiles positions</summary>
+		std::vector<XMFLOAT2> aafTilePos;
+		/// <summary>constant hex tile size</summary>
+		const float fTileSize = 1.f;
+	} m_sScene;
 
 private:
 
