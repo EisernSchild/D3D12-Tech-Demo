@@ -44,7 +44,7 @@ float3 graduate(float3 fV, float fR)
 
 float4 main(in In sIn) : SV_Target
 {
-	/*
+	
 	// compute terrain texture.. we later move that to the compute shader
 	float2 sUV = sIn.sUvPos.xz;
 	// float2 sUV = float2(sIn.sUvPos.x + (sTime.x * 20.), sIn.sUvPos.z);
@@ -52,7 +52,7 @@ float4 main(in In sIn) : SV_Target
 	float3 afHeight = fbm(sUV * fFbmScale, 1.);
 
 	return float4(.2, afHeight.yz, 1.);
-	*/
+	
 
 	// draw b/w grid based on uv position
 	/*return max(lerp(float4(0.2, 0.3, 0.4, 1.), float4(0.1, 1., 0.2, 1.), fY) + pow(sIn.sPosH.z, 2) * .001,
@@ -76,6 +76,7 @@ float4 main(in In sIn) : SV_Target
 			, 1.f), .5);
 	*/
 
+	/*
 	// simple hexagon, draw current hex center
 	float4 sCol = float4(0.02, 0.025, 0.025, 1.) * pow(sIn.sPosH.z * 2., 3);
 	float fDist = distance(sHexUV.zw, sIn.sUvPos.xz);
@@ -87,4 +88,5 @@ float4 main(in In sIn) : SV_Target
 		smoothstep(float3(.9f, .9f, .9f), float3(.99f, .99f, .99f), frac(sIn.sCol.w * 1.)) * .3 +
 		smoothstep(float3(.9f, .9f, .9f), float3(.99f, .99f, .99f), 1. - frac(sIn.sCol.w * 1.)) * .3
 	, 1.f));
+	*/
 }

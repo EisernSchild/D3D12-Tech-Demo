@@ -33,20 +33,6 @@ struct Out
 	float4 sUvPos : TEXCOORD0;
 };
 
-// provide one of 6 hexagonal corner points
-float2 hex_corner(float fSize, uint uI)
-{
-	float fAngle_deg = 60. * (float)(uI % 6) - 30.;
-	float fAngle_rad = PI / 180. * fAngle_deg;
-	return float2(fSize * cos(fAngle_rad), fSize * sin(fAngle_rad));
-}
-
-// provide vector to neighbour field (index 0..5)
-float2 to_next_field(float fSize, uint uI)
-{
-	return (hex_corner(fSize, uI) - hex_corner(fSize, (uI + 2) % 6));
-}
-
 Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID)
 {
 	Out sOut;

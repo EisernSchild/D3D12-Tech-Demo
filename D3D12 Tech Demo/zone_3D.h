@@ -26,20 +26,36 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
-// provide one of 6 hexagonal corner points
-inline XMFLOAT2 hex_corner(float fSize, uint uI)
+/// <summary>provide one of 6 hexagonal corner points</summary>
+inline XMFLOAT2 HexCorner(float fSize, uint uI)
 {
-	float fAngle_deg = 60.f * (float)(uI % 6) - 30.f;
-	float fAngle_rad = (XM_PI / 180.f) * fAngle_deg;
-	return XMFLOAT2{ fSize * cos(fAngle_rad), fSize * sin(fAngle_rad) };
+	float fAngleDeg = 60.f * (float)(uI % 6) - 30.f;
+	float fAngleRad = (XM_PI / 180.f) * fAngleDeg;
+	return XMFLOAT2{ fSize * cos(fAngleRad), fSize * sin(fAngleRad) };
 }
 
-// provide vector to neighbour field (index 0..5)
-inline XMFLOAT2 to_next_field(float fSize, uint uI)
+/// <summary>provide vector to neighbour field (index 0..5)</summary>
+inline XMFLOAT2 HexNext(float fSize, uint uI)
 {
-	XMFLOAT2 afC0 = hex_corner(fSize, uI);
-	XMFLOAT2 afC1 = hex_corner(fSize, (uI + 2) % 6);
-	return XMFLOAT2{ afC0.x - afC1.x, afC0.y - afC1.y };
+	const float fMinW = sqrt(fSize * fSize - (fSize * .5f * fSize * .5f)) * 2.f;
+	float fAngleDeg = 60.f * (float)(uI % 6);
+	float fAngleRad = (XM_PI / 180.f) * fAngleDeg;
+	return XMFLOAT2{ fMinW * cos(fAngleRad), fMinW * sin(fAngleRad) };
+}
+
+/// <summary>Cartesian to hex coordinates</summary>
+inline XMFLOAT2 HexUV(float fX, float fY)
+{
+	// hex coords       (u, v) = (          .5 * x + .5 * y,        y ) 
+	// hex coord scaled (u, v) = ((sqrt(3.f) * x + y) / 3.f, y / 1.5f )
+	return XMFLOAT2{ (sqrt(3.f) * fX + fY) / 3.f, fY / 1.5f };
+}
+
+/// <summary>Hex to cartesian coordinates</summary>
+inline XMFLOAT2 HexXY(float fU, float fV)
+{
+	// get cartesian coords
+	return XMFLOAT2{ (fU * 3.f - fV * 1.5f) / sqrt(3.f), fV * 1.5f };
 }
 
 /// <summary>Simple Sample vertex</summary>

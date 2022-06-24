@@ -268,6 +268,8 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	ConstantsScene sConstants = {};
 	static float s_fTimeOld = 0.f;
 	float fTimeEl = sData.fTotal - s_fTimeOld;
+	static float s_fTmp = 0.f;
+	s_fTmp += fTimeEl;
 
 	/// world - view - projection
 	{
@@ -335,31 +337,56 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	/// hex uv
 	{
 		// get position xz
-		float fX = m_sScene.sCamPos.x;
-		float fY = m_sScene.sCamPos.z;
+		XMFLOAT2 sXY = XMFLOAT2{ m_sScene.sCamPos.x, m_sScene.sCamPos.z };
 
-		// hex coords       (u, v) = (          .5 * x + .5 * y,        y ) 
-		// hex coord scaled (u, v) = ((sqrt(3.f) * x + y) / 3.f, y / 1.5f )
-		float fU = m_sScene.sHexUV.x = (sqrt(3.f) * fX + fY) / 3.f;
-		float fV = m_sScene.sHexUV.y = fY / 1.5f;
+		// get uv
+		XMFLOAT2 sUV = m_sScene.sHexUV = HexUV(sXY.x, sXY.y);
 
 		// get rounded uv = hex center (not fully mathematically correct but enough for our purpose)
-		float fUc = m_sScene.sHexUVc.x = round(fU);
-		float fVc = m_sScene.sHexUVc.y = round(fV);
+		float fUc = m_sScene.sHexUVc.x = round(sUV.x);
+		float fVc = m_sScene.sHexUVc.y = round(sUV.y);
 
 		// get cartesian hex center
-		fX = m_sScene.sHexXYc.x = (fUc * 3.f - fVc * 1.5f) / sqrt(3.f);
-		fY = m_sScene.sHexXYc.y = fVc * 1.5f;
+		sXY = HexXY(fUc, fVc);
 
 		// store to constants
-		XMVECTOR sUV = XMVectorSet(fX, fY, fU, fV);
-		XMStoreFloat4(&sConstants.sHexUV, sUV);
+		XMVECTOR sUVv = XMVectorSet(sXY.x, sXY.y, sUV.x, sUV.y);
+		XMStoreFloat4(&sConstants.sHexUV, sUVv);
 
 		// loop through tiles by index
-		for (unsigned uIx(0); uIx < (unsigned)m_sScene.aafTilePos.size(); uIx++)
+		for (unsigned uIx(0); uIx < min(m_sScene.uInstN, (unsigned)m_sScene.aafTilePos.size()); uIx++)
 		{
+			// get tile uv relative to new center
+			XMFLOAT2 sTileXY = XMFLOAT2{ m_sScene.aafTilePos[uIx].x - sXY.x, m_sScene.aafTilePos[uIx].y - sXY.y };
+			XMFLOAT2 sTileUV = HexUV(sTileXY.x, sTileXY.y);
 
+			// convert axial (uv) to cube coords (qrs)
+			float fQ = round(sTileUV.x);
+			float fR = -round(sTileUV.y);
+			float fS = -fQ - fR;
+			
+			// get cube distance
+			float fDistCube = (abs(fQ) + abs(fR) + abs(fS)) / 2.f;
+
+			// off rim ?
+			if (fDistCube > float(m_sScene.uAmbitN))
+			{
+				// get offset to old center
+				sTileXY = XMFLOAT2{ m_sScene.aafTilePos[uIx].x - m_sScene.sHexXYc.x, m_sScene.aafTilePos[uIx].y - m_sScene.sHexXYc.y };
+
+				// negate tile offset
+				sTileXY.x *= -1.f;
+				sTileXY.y *= -1.f;
+
+				// set new to rim
+				m_sScene.aafTilePos[uIx] = m_sScene.sHexXYc + sTileXY;
+				m_sScene.aafTilePos[uIx].x += sXY.x - m_sScene.sHexXYc.x;
+				m_sScene.aafTilePos[uIx].y += sXY.y - m_sScene.sHexXYc.y;
+			}
 		}
+
+		// set hex center as old for next frame
+		m_sScene.sHexXYc = sXY;
 	}
 
 	// and update
@@ -380,6 +407,9 @@ signed App_D3D12::Draw(const AppData& sData)
 	// reset
 	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
 	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), m_sD3D.psPSO->Get()));
+
+	// and update the constant buffer ( move that later... )
+	UpdateHexOffsets(D3D12_RESOURCE_STATE_GENERIC_READ);
 
 	// transit to render target
 	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
@@ -737,16 +767,15 @@ signed App_D3D12::BuildGeometry()
 		// create basic hexagon with 6 triangles
 		// (each triangle one side and center)
 		// set normalized distance (= size unit = 1.f) to y
-		float fHalfWidth = sqrt(1.f - (.5f * .5f));
 		std::vector<XMFLOAT3> asHexVtc =
 		{
-			{        0.0f, 0.0f,  0.0f }, // center
-			{        0.0f, 1.0f, -1.0f }, // top
-			{  fHalfWidth, 1.0f, -0.5f }, // top right
-			{  fHalfWidth, 1.0f,  0.5f }, // bottom right
-			{        0.0f, 1.0f,  1.0f }, // bottom
-			{ -fHalfWidth, 1.0f,  0.5f }, // bottom left
-			{ -fHalfWidth, 1.0f, -0.5f }, // top left
+			{                  0.0f, 0.0f,  0.0f }, // center
+			{                  0.0f, 1.0f, -1.0f }, // top
+			{  m_sScene.fMinW * .5f, 1.0f, -0.5f }, // top right
+			{  m_sScene.fMinW * .5f, 1.0f,  0.5f }, // bottom right
+			{                  0.0f, 1.0f,  1.0f }, // bottom
+			{ -m_sScene.fMinW * .5f, 1.0f,  0.5f }, // bottom left
+			{ -m_sScene.fMinW * .5f, 1.0f, -0.5f }, // top left
 		};
 		std::vector<std::uint16_t> auHexIdc =
 		{
@@ -848,11 +877,10 @@ signed App_D3D12::BuildGeometry()
 
 	// create a hex tile offset buffer (containing the xy positions of the tiles (float2))
 	{
-		const unsigned uElementSz = sizeof(float) * 2;
 		D3D12_RESOURCE_DESC sBufDc = {
 			D3D12_RESOURCE_DIMENSION_BUFFER,
 			0,
-			Align8Bit(m_sScene.uInstN * uElementSz),
+			Align8Bit(m_sScene.uInstN * m_sScene.uVec2Sz),
 			1,
 			1,
 			1,
@@ -884,7 +912,7 @@ signed App_D3D12::BuildGeometry()
 		for (unsigned uInstIx(0); uInstIx < Align8Bit(m_sScene.uInstN); uInstIx++)
 		{
 			XMFLOAT2 sInstOffset = XMFLOAT2{ 0.f, 0.f };
-			if (uInstIx > 0)
+			if ((uInstIx > 0) && (uInstIx < m_sScene.uInstN))
 			{
 				unsigned uMul = (uInstIx - 1) / 6;
 				unsigned uOffset = (uInstIx - 1) % 6;
@@ -901,22 +929,18 @@ signed App_D3D12::BuildGeometry()
 				}
 
 				// move
-				sInstOffset = to_next_field(m_sScene.fTileSize, uOffset) * (float)uAmbit;
+				sInstOffset = HexNext(m_sScene.fTileSz, uOffset) * (float)uAmbit;
 				if (uIx > uOffset)
-					sInstOffset = sInstOffset + to_next_field(m_sScene.fTileSize, uOffset + 2) * (float)(uIx / 6);
+					sInstOffset = sInstOffset + HexNext(m_sScene.fTileSz, uOffset + 2) * (float)(uIx / 6);
 			}
 			m_sScene.aafTilePos.push_back(sInstOffset);
 		}
 
-		// update the constant buffer for the tils offsets
-		{
-			D3D12_SUBRESOURCE_DATA sSubData = { m_sScene.aafTilePos.data(), (LONG_PTR)(m_sScene.aafTilePos.size() * uElementSz), (LONG_PTR)(m_sScene.aafTilePos.size() * uElementSz) };
-			const CD3DX12_RB_TRANSITION sResBr(m_sD3D.psTileLayout.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+		// backup initial positions
+		m_sScene.aafTilePosInit.insert(m_sScene.aafTilePosInit.begin(), m_sScene.aafTilePos.begin(), m_sScene.aafTilePos.end());
 
-			// schedule update to command list
-			UpdateSubresources<1>(m_sD3D.psCmdList.Get(), m_sD3D.psTileLayout.Get(), m_sD3D.psTileLayoutUp.Get(), 0, 0, 1, &sSubData);
-			m_sD3D.psCmdList->ResourceBarrier(1, &sResBr);
-		}
+		// and update the constant buffer
+		UpdateHexOffsets(D3D12_RESOURCE_STATE_COPY_DEST);
 
 		// get handle
 		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv] =
@@ -930,35 +954,11 @@ signed App_D3D12::BuildGeometry()
 			D3D12_SRV_DIMENSION_BUFFER,
 			D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING, {}
 		};
-		sSrvDc.Buffer = { 0, m_sScene.uInstN, uElementSz, D3D12_BUFFER_SRV_FLAG_NONE };
+		sSrvDc.Buffer = { 0, m_sScene.uInstN, m_sScene.uVec2Sz, D3D12_BUFFER_SRV_FLAG_NONE };
 		CD3DX12_CPU_DESCRIPTOR_HANDLE sSrvHeapHandle(m_sD3D.psHeapRTV->GetCPUDescriptorHandleForHeapStart());
 		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psTileLayout.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
 	}
 
 	return APP_FORWARD;
-}
-
-/// <summary>D3DCompileFromFile wrapper</summary>
-signed App_D3D12::CompileFromFile(
-	const std::wstring& atFilename,
-	const D3D_SHADER_MACRO& sDefines,
-	const std::string& atEntrypoint,
-	const std::string& atTarget,
-	ComPtr<ID3DBlob>& pcDest)
-{
-	if (pcDest != nullptr) { OutputDebugStringA("App : Invalid Source Code Arg !"); return APP_ERROR; }
-
-	UINT uFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG)  
-	uFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif
-
-	ComPtr<ID3DBlob> pcErrors;
-	HRESULT nHr = D3DCompileFromFile(atFilename.c_str(), &sDefines, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-		atEntrypoint.c_str(), atTarget.c_str(), uFlags, 0, &pcDest, &pcErrors);
-
-	if (pcErrors != nullptr) OutputDebugStringA((char*)pcErrors->GetBufferPointer());
-
-	return nHr;
 }
 

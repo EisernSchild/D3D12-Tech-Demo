@@ -40,7 +40,7 @@
     <ClInclude Include="..\..\d3dx12.h">
       <Filter>app</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\const_3D.h">
+    <ClInclude Include="..\..\zone_3D.h">
       <Filter>app</Filter>
     </ClInclude>
     <ClInclude Include="..\..\mesh.h">

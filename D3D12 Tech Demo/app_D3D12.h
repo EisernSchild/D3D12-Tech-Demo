@@ -154,13 +154,19 @@ protected:
 		/// <summary>camera pitch, yaw</summary>
 		float fYaw = 0.f, fPitch = 0.f;
 		/// <summary>number of hex ambits (or "circles") around the main hexagon</summary>
-		const unsigned uAmbitN = 16;
+		const unsigned uAmbitN = 48;
 		/// <summary>number of hex tiles (or instances), to be computed</summary>
 		unsigned uInstN = 1;
-		/// <summary>hex tiles positions</summary>
+		/// <summary>hex tiles positions (current)</summary>
 		std::vector<XMFLOAT2> aafTilePos;
+		/// <summary>hex tiles positions (initial)</summary>
+		std::vector<XMFLOAT2> aafTilePosInit;
 		/// <summary>constant hex tile size</summary>
-		const float fTileSize = 1.f;
+		const float fTileSz = 1.f;
+		/// <summary>constant hex tile minimum width</summary>
+		const float fMinW = sqrt(1.f - (.5f * .5f)) * 2.f;
+		/// <summary>Size of Vector2</summary>
+		const unsigned uVec2Sz = sizeof(float) * 2;
 	} m_sScene;
 
 private:
@@ -177,13 +183,20 @@ private:
 	};
 	static constexpr unsigned uSrvN = 7;
 
-	/// <summary>D3DCompileFromFile wrapper</summary>
-	static signed CompileFromFile(
-		const std::wstring& atFilename,
-		const D3D_SHADER_MACRO& sDefines,
-		const std::string& atEntrypoint,
-		const std::string& atTarget,
-		ComPtr<ID3DBlob>& pcDest);
+	/// <summary>upload hex tiles xy vector offsets to constant buffer</summary>
+	static void UpdateHexOffsets(D3D12_RESOURCE_STATES eState)
+	{
+		// update the constant buffer for the tiles offsets
+		D3D12_SUBRESOURCE_DATA sSubData = { m_sScene.aafTilePos.data(), (LONG_PTR)(m_sScene.aafTilePos.size() * m_sScene.uVec2Sz), (LONG_PTR)(m_sScene.aafTilePos.size() * m_sScene.uVec2Sz) };
+		const CD3DX12_RB_TRANSITION sResBr0(m_sD3D.psTileLayout.Get(), eState, D3D12_RESOURCE_STATE_COPY_DEST);
+		const CD3DX12_RB_TRANSITION sResBr1(m_sD3D.psTileLayout.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+
+		// schedule update to command list
+		if (eState != D3D12_RESOURCE_STATE_COPY_DEST)
+			m_sD3D.psCmdList->ResourceBarrier(1, &sResBr0);
+		UpdateSubresources<1>(m_sD3D.psCmdList.Get(), m_sD3D.psTileLayout.Get(), m_sD3D.psTileLayoutUp.Get(), 0, 0, 1, &sSubData);
+		m_sD3D.psCmdList->ResourceBarrier(1, &sResBr1);
+	}
 };
 
 #else
