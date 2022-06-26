@@ -33,7 +33,7 @@ struct In
 };
 
 // phong constants
-static const float4 sDiffuseAlbedo = { .3f, .8f, .9f, 1.0f };
+static const float4 sDiffuseAlbedo = { .9f, .9f, 1.f, 1.0f };
 static const float3 sFresnelR0 = { 0.01f, 0.01f, 0.01f };
 static const float4 sAmbientLight = { 0.3f, 0.4f, 0.5f, 1.0f };
 static const float fRoughness = 0.15f;
@@ -74,7 +74,7 @@ float3 SchlickFresnel(float3 R0, float3 normal, float3 lightVec)
 }
 
 // BlinnPhong method by Frank Luna (C) 2015 All Rights Reserved.
-float3 BlinnPhong(float3 sDiffuse, float3 lightStrength, float3 lightVec, float3 normal, float3 toEye)
+float3 BlinnPhong(float3 sDiffuse, float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, float fSpec)
 {
 	const float m = (1.f - fRoughness) * 256.0f;
 	float3 halfVec = normalize(toEye + lightVec);
@@ -86,7 +86,7 @@ float3 BlinnPhong(float3 sDiffuse, float3 lightStrength, float3 lightVec, float3
 
 	// Our spec formula goes outside [0,1] range, but we are 
 	// doing LDR rendering.  So scale it down a bit.
-	specAlbedo = specAlbedo / (specAlbedo + 1.0f);
+	specAlbedo = (specAlbedo / (specAlbedo + 1.0f)) * fSpec;
 
 	return (sDiffuse + specAlbedo) * lightStrength;
 }
@@ -95,9 +95,12 @@ float4 main(in In sIn) : SV_Target
 {
 	// compute terrain texture.. we later move that to the compute shader
 	float2 sUV = sIn.sPosW.xz;
-	float fFbmScale = .05f;
-	float fHeight = max((fbm(sUV * fFbmScale, .5) + 1.) * .5f, 0.f);
+	float fFbmScale = .05f, fFbmScaleSimplex = .5f;
+	float fHeight = max((fbm(sUV* fFbmScale, .5) + 1.) * .5f, 0.f);
 	float3 sDiffuse = lerp(float3(1., 1., 1.) - sDiffuseAlbedo.xyz, sDiffuseAlbedo.xyz, fHeight);
+
+	float fSimplex = frac_noise_simplex(sUV * fFbmScaleSimplex) * frac_noise_simplex(sUV * fFbmScaleSimplex * .5);
+	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), fSimplex), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
 
 	// renormalize
 	sIn.sNormal = normalize(sIn.sNormal);
@@ -109,7 +112,7 @@ float4 main(in In sIn) : SV_Target
 	float3 sStr = sStrength * fNdotL;
 
 	// do phong
-	float4 sLitColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sIn.sNormal, sToEyeW), 1.f);
+	float4 sLitColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sIn.sNormal, sToEyeW, smoothstep(.5, .55, abs(fHeight))), 1.f);
 		
 	return sLitColor;
 
