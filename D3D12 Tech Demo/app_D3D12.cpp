@@ -308,6 +308,10 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 			XMMatrixRotationAxis(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), m_sScene.fPitch);
 		XMStoreFloat4x4(&sView, sV);
 		m_sScene.sCamVelo = m_sScene.sCamVelo * m_sScene.fDrag;
+		XMVECTOR sCamPos = XMVectorSet(m_sScene.sCamPos.x, m_sScene.sCamPos.y, m_sScene.sCamPos.z, 0.f);
+		XMVECTOR sCamVelo = XMVectorSet(m_sScene.sCamVelo.x, m_sScene.sCamVelo.y, m_sScene.sCamVelo.z, 0.f);
+		XMStoreFloat4(&sConstants.sCamPos, sCamPos);
+		XMStoreFloat4(&sConstants.sCamVelo, sCamVelo);
 
 		XMMATRIX sW = XMLoadFloat4x4(&sWorld);
 		XMMATRIX sPr = XMLoadFloat4x4(&sProj);

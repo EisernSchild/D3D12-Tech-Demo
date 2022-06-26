@@ -82,6 +82,10 @@ struct ConstantsScene
 	XMFLOAT4 sMouse;
 	/// <summary>hexagonal uv (x - x cartesian center, y - y cartesian center, z - u center, w - v center)</summary>
 	XMFLOAT4 sHexUV;
+	/// <summary>camera position (xyz - position)</summary>
+	XMFLOAT4 sCamPos;
+	/// <summary>camera velocity 3d vector (xyz - direction)</summary>
+	XMFLOAT4 sCamVelo;
 };
 
 /// <summary>round up to nearest multiple of 256</summary>

@@ -21,7 +21,35 @@ float2 hash(in float2 vX)
 }
 
 // return gradient noise (in x) and its derivatives (in yz)
-float3 noised(in float2 afP)
+float noised(in float2 afP)
+{
+    float2 vI = floor(afP);
+    float2 vF = frac(afP);
+
+    // we always use quintic interpolation ! (no terrain flaws !)
+#if 1
+    // quintic interpolation
+    float2 vU = vF * vF * vF * (vF * (vF * 6.0 - 15.0) + 10.0);
+#else
+    // cubic interpolation
+    float2 vU = vF * vF * (3.0 - 2.0 * vF);
+#endif    
+
+    // get random values (3 derivate values build a quad)
+    float2 avQuad[4] = { float2(0.0, 0.0), float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0, 1.0) };
+    float2 avG[4];
+    float afV[4];
+    for (int nI = 0; nI < 4; nI++)
+    {
+        avG[nI] = hash(vI + avQuad[nI]);
+        afV[nI] = dot(avG[nI], vF - avQuad[nI]);
+    }
+
+    return afV[0] + vU.x * (afV[1] - afV[0]) + vU.y * (afV[2] - afV[0]) + vU.x * vU.y * (afV[0] - afV[1] - afV[2] + afV[3]);   // value
+}
+
+// return gradient noise (in x) and its derivatives (in yz)
+float3 noised_der(in float2 afP)
 {
     float2 vI = floor(afP);
     float2 vF = frac(afP);
@@ -57,7 +85,7 @@ float3 noised(in float2 afP)
 // vX - coordinates
 // fH - the Hurst Exponent (H)
 //
-float3 fbm(in float2 vX, in float fH)
+float3 fbm_der(in float2 vX, in float fH)
 {
     // gain factor (G)
     float fG = exp2(-fH);
@@ -78,4 +106,40 @@ float3 fbm(in float2 vX, in float fH)
         fA *= fG;
     }
     return float3(fT, vD);
+}
+
+// Fractional Brownian Motion
+//
+// vX - coordinates
+// fH - the Hurst Exponent (H)
+//
+float fbm(in float2 vX, in float fH)
+{
+    // gain factor (G)
+    float fG = exp2(-fH);
+    // function, accumulation multiplier
+    float fF = 1.0, fA = 1.0;
+    // value
+    float fT = 0.0;
+    
+    for (int nI = 0; nI < OCTAVES; nI++)
+    {
+        float fN = noised(fF * vX);
+        fT += fA * fN; // accumulate values
+        fF *= 2.0;
+        fA *= fG;
+    }
+
+    return fT;
+}
+
+float3 fbm_normal(in float2 vX)
+{
+    float3 vV =
+        float3(
+            fbm(vX - float2(-.1, .0), 1.) - fbm(vX - float2( .1, .0), 1.),
+            fbm(vX, 1.),
+            fbm(vX - float2(.0, -.1), 1.) - fbm(vX - float2(.0, .1), 1.)
+            );
+    return vV;
 }

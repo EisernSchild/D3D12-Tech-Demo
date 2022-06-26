@@ -16,6 +16,12 @@ cbuffer sScene : register(b0)
 	float4 sViewport;
 	/// mouse (x - x position, y - y position, z - buttons (uint), w - wheel (uint))
 	float4 sMouse;
+	/// hexagonal uv (x - x cartesian center, y - y cartesian center, z - u center, w - v center)
+	float4 sHexUV;
+	/// camera position (xyz - position)
+	float4 sCamPos;
+	/// camera velocity 3d vector (xyz - direction)
+	float4 sCamVelo;
 };
 
 Buffer<float2> avTilePos : register(t0);
@@ -28,9 +34,10 @@ struct In
 
 struct Out
 {
-	float4 sPosH  : SV_POSITION;
-	float4 sCol   : COLOR;
-	float4 sUvPos : TEXCOORD0;
+	float4 sPosH   : SV_POSITION;
+	float3 sPosW   : POSITION;
+	float4 sCol    : COLOR;
+	float3 sNormal : NORMAL;
 };
 
 Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID)
@@ -44,18 +51,21 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 	float3 sPosL = sIn.sPosL + float3(sInstOffset.x, 0., sInstOffset.y);
 
 	// compute terrain.. we later move that to the compute shader
-	float2 sUV = sPosL.xz;
-	// float2 sUV = float2(sPosL.x + (sTime.x * 20.), sPosL.z);
 	const float2 afFbmScale = float2(.05f, 10.f);
-	float3 afHeight = fbm(sUV * afFbmScale.x, 1.)* afFbmScale.y;
-	sPosL.y = afHeight.x;
+	float2 sUV = sPosL.xz;
+
+	float3 afHeight = fbm_normal(sUV * afFbmScale.x);
+	sPosL.y = afHeight.y * afFbmScale.y;
+
+	// set normal
+	sOut.sNormal = normalize(float3(afHeight.x * afFbmScale.y, .1f, afHeight.z * afFbmScale.y));
 
 	// transform to homogeneous clip space, pass color
 	sOut.sPosH = mul(float4(sPosL, 1.0f), sWVP);
 	sOut.sCol = sIn.sCol;
 
-	// pass coordinate as uv (preliminary), set vertex id as w
-	sOut.sUvPos = float4(sPosL, (float)uVxIx);
+	// set world position
+	sOut.sPosW = sPosL;
 
 	return sOut;
 }
