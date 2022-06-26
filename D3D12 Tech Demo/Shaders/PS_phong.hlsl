@@ -97,12 +97,19 @@ float4 main(in In sIn) : SV_Target
 	float2 sUV = sIn.sPosW.xz;
 	float fFbmScale = .05f, fFbmScaleSimplex = .5f;
 	float fHeight = max((fbm(sUV* fFbmScale, .5) + 1.) * .5f, 0.f);
+	
+	// get base height color
 	float3 sDiffuse = lerp(float3(1., 1., 1.) - sDiffuseAlbedo.xyz, sDiffuseAlbedo.xyz, fHeight);
 
-	float fSimplex = frac_noise_simplex(sUV * fFbmScaleSimplex) * frac_noise_simplex(sUV * fFbmScaleSimplex * .5);
-	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), fSimplex), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
+	// draw rocks
+	float fRocks = frac_noise_simplex(sUV* fFbmScaleSimplex * .2);
+	sDiffuse = lerp(float3(.1, .1, .1), sDiffuse, max(fHeight, fRocks));
 
-	// renormalize
+	// draw grassland
+	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex);
+	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), max(1.0f  - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
+
+	// renormalize normal
 	sIn.sNormal = normalize(sIn.sNormal);
 
 	// to camera vector, ambient light
