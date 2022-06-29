@@ -67,5 +67,8 @@
     <FxCompile Include="..\..\Shaders\CS_post.hlsl">
       <Filter>shader</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\RS_library.hlsl">
+      <Filter>shader</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

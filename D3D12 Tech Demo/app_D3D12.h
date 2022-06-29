@@ -47,10 +47,12 @@ protected:
 	static signed OnResize();
 	/// <summary>Update constants</summary>
 	static signed UpdateConstants(const AppData& sData);
+	/// <summary>clear render target</summary>
+	static void Clear();
 	/// <summary>First draw test function</summary>
 	static signed Draw(const AppData& sData);
 	/// <summary>Compute shader post processing</summary>
-	static void ExecutePostProcessing(ID3D12GraphicsCommandList* psCmdList,
+	static void ExecutePost(ID3D12GraphicsCommandList* psCmdList,
 		ID3D12RootSignature* psRootSign,
 		ID3D12PipelineState* psPSO,
 		ID3D12Resource* psInput);
@@ -66,8 +68,26 @@ protected:
 	static signed CreateTextures();
 	/// <summary>Build the geometry of the scene</summary>
 	static signed BuildGeometry();
+	/// <summary>Create a pipeline state object for DXR</summary>
+	static signed CreateDXRStateObject();
+	/// <summary>Sample geometry triange... to be deleted</summary>
+	static void BuildSceneGeometry();
+	/// <summary>Create the acceleration structures for DXR</summary>
+	static signed CreateDXRAcceleration();
+	/// <summary>Create the shader tables for DXR</summary>
+	static void BuildDXRShaderTables();
+	/// <summary>execute raytracing</summary>
+	static void DoRaytracing();
+	/// <summary>DXR render method</summary>
+	static void DrawDXR();
+	/// <summary>copy RenderMap0 to render target (back buffer)</summary>
+	static void RenderMap2Backbuffer();
 	/// <summary>Double back buffer ( = 2 )</summary>
 	static constexpr int nSwapchainBufferN = 2;
+
+	// Geometry.. to be deleted
+	using Index = uint16_t;
+	struct Vertex { float v1, v2, v3; };
 
 	static struct D3D12_Fields
 	{
@@ -81,6 +101,8 @@ protected:
 		DXGI_FORMAT eBackbufferFmt = DXGI_FORMAT_R8G8B8A8_UNORM, eDepthstencilFmt = DXGI_FORMAT_D24_UNORM_S8_UINT;
 		/// <summary>true if 4 x MSAA</summary>
 		bool b4xMsaaState = false;
+		/// <summary>true if DXR is supported by device</summary>
+		bool bDXRSupport = false;
 		/// <summary>4 x MSAA Quality</summary>
 		UINT u4xMsaaQuality = 0;
 		/// <summary>the screen viewport</summary>
@@ -91,6 +113,8 @@ protected:
 		std::unique_ptr<Mesh_PosCol> pcHexMesh = nullptr;
 		/// <summary>shaders root signature</summary>
 		ComPtr<ID3D12RootSignature> psRootSign = nullptr;
+		/// <summary>shaders root signature</summary>
+		ComPtr<ID3D12RootSignature> psDXRRootSign = nullptr;
 		/// <summary>constant buffer view descriptor heap</summary>
 		ComPtr<ID3D12DescriptorHeap> psHeapSRV = nullptr;
 		/// <summary>sampler state descriptor heap</summary>
@@ -100,9 +124,9 @@ protected:
 		/// <summary>the pipeline state object</summary>
 		std::shared_ptr<D3D12_PSO> psPSO;
 		/// <summary>the actual swap chain</summary>
-		ComPtr<IDXGISwapChain> psSwapchain;
+		ComPtr<IDXGISwapChain3> psSwapchain;
 		/// <summary>D3D12 device</summary>
-		ComPtr<ID3D12Device> psDevice;
+		ComPtr<ID3D12Device5> psDevice;
 		/// <summary>fence synchonization object</summary>
 		ComPtr<ID3D12Fence> psFence;
 		/// <summary>D3D12 command queue</summary>
@@ -110,7 +134,7 @@ protected:
 		/// <summary>D3D12 command list allocator</summary>
 		ComPtr<ID3D12CommandAllocator> psCmdListAlloc;
 		/// <summary>D3D12 command list</summary>
-		ComPtr<ID3D12GraphicsCommandList> psCmdList;
+		ComPtr<ID3D12GraphicsCommandList4> psCmdList;
 		/// <summary>swap chain buffer array</summary>
 		ComPtr<ID3D12Resource> apsBufferSC[nSwapchainBufferN];
 		/// <summary>depth stencil buffer</summary>
@@ -123,14 +147,30 @@ protected:
 		ComPtr<ID3D12PipelineState> psPSOCS = nullptr;
 		/// <summary>shader (compute) root signature</summary>
 		ComPtr<ID3D12RootSignature> psRootSignCS = nullptr;
-		/// <summary>Main render target post processing buffers</summary>
-		ComPtr<ID3D12Resource> psPostMap0 = nullptr, psPostMap1 = nullptr;
+		/// <summary>Main render targets</summary>
+		ComPtr<ID3D12Resource> psRenderMap0 = nullptr, psRenderMap1 = nullptr;
 		/// <summary>Buffer containing the terrain (hex) tiles xy position + upload buffer</summary>
 		ComPtr<ID3D12Resource> psTileLayout = nullptr, psTileLayoutUp = nullptr;
 		/// <summary>all resource view handles (GPU), enumerated in CbvSrvUav_Heap_Idc</summary>
 		std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE> asCbvSrvUavGpuH = std::vector<CD3DX12_GPU_DESCRIPTOR_HANDLE>(uSrvN);
 		/// <summary>all resource view handles (CPU), enumerated in CbvSrvUav_Heap_Idc</summary>
 		std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE> asCbvSrvUavCpuH = std::vector<CD3DX12_CPU_DESCRIPTOR_HANDLE>(uSrvN);
+		/// <summary>state object for raytracing</summary>
+		ComPtr<ID3D12StateObject> psDXRStateObject;
+		/// <summary>bottom level acceleration structure</summary>
+		ComPtr<ID3D12Resource> psBotAccelStruct;
+		/// <summary>top level acceleration structure</summary>
+		ComPtr<ID3D12Resource> psTopAccelStruct;
+		/// <summary>miss shader table</summary>
+		ComPtr<ID3D12Resource> psMissTable;
+		/// <summary>hit group shader table</summary>
+		ComPtr<ID3D12Resource> psHitGroupTable;
+		/// <summary>ray gen shader table</summary>
+		ComPtr<ID3D12Resource> psRayGenTable;
+		/// <summary>sample index buffer, to be deleted</summary>
+		ComPtr<ID3D12Resource> psIB;
+		/// <summary>sample vertex buffer, to be deleted</summary>
+		ComPtr<ID3D12Resource> psVB;
 	} m_sD3D;
 
 	static struct SceneData 
