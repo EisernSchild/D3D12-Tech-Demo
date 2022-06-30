@@ -80,6 +80,10 @@ protected:
 	static void DrawDXR();
 	/// <summary>copy RenderMap0 to render target (back buffer)</summary>
 	static void RenderMap2Backbuffer();
+	/// <summary>translate hex tiles by compute shader</summary>
+	static void OffsetTiles(ID3D12GraphicsCommandList* psCmdList,
+		ID3D12RootSignature* psRootSign,
+		ID3D12PipelineState* psPSO);
 	/// <summary>Double back buffer ( = 2 )</summary>
 	static constexpr int nSwapchainBufferN = 2;
 
@@ -137,8 +141,10 @@ protected:
 		ComPtr<ID3D12DescriptorHeap> psHeapRTV;
 		/// <summary>depth stencil view descriptor heap</summary>
 		ComPtr<ID3D12DescriptorHeap> psHeapDSV;
-		/// <summary>the pipeline state object (compute shader)</summary>
-		ComPtr<ID3D12PipelineState> psPSOCS = nullptr;
+		/// <summary>the pipeline state object (compute shader post)</summary>
+		ComPtr<ID3D12PipelineState> psPsoCsPost = nullptr;
+		/// <summary>the pipeline state object (compute shader hex translate)</summary>
+		ComPtr<ID3D12PipelineState> psPsoCsHexTrans = nullptr;
 		/// <summary>shader (compute) root signature</summary>
 		ComPtr<ID3D12RootSignature> psRootSignCS = nullptr;
 		/// <summary>Main render targets</summary>
@@ -187,16 +193,20 @@ protected:
 		const unsigned uAmbitN = 48;
 		/// <summary>number of hex tiles (or instances), to be computed</summary>
 		unsigned uInstN = 1;
+		/// <summary>number of vertices of one hex tile, to be computed</summary>
+		unsigned uBaseVtxN = 0;
 		/// <summary>hex tiles positions (current)</summary>
-		std::vector<XMFLOAT2> aafTilePos;
+		std::vector<XMFLOAT4> aafTilePos;
 		/// <summary>hex tiles positions (initial)</summary>
-		std::vector<XMFLOAT2> aafTilePosInit;
+		std::vector<XMFLOAT4> aafTilePosInit;
 		/// <summary>constant hex tile size</summary>
 		const float fTileSz = 1.f;
 		/// <summary>constant hex tile minimum width</summary>
 		const float fMinW = sqrt(1.f - (.5f * .5f)) * 2.f;
-		/// <summary>Size of Vector2</summary>
-		const unsigned uVec2Sz = sizeof(float) * 2;
+		/// <summary>Size of Vector4</summary>
+		const unsigned uVec4Sz = sizeof(float) * 4;
+		/// <summary>constants upload struture</summary>
+		ConstantsScene sConstants = {};
 	} m_sScene;
 
 private:
@@ -209,7 +219,8 @@ private:
 		PostMap0Uav = 2,
 		PostMap1Srv = 3,
 		PostMap1Uav = 4,
-		TileOffsetSrv = 5
+		TileOffsetSrv = 5,
+		MeshVtcUav = 6
 	};
 	static constexpr unsigned uSrvN = 7;
 
@@ -217,7 +228,7 @@ private:
 	static void UpdateHexOffsets(D3D12_RESOURCE_STATES eState)
 	{
 		// update the constant buffer for the tiles offsets
-		D3D12_SUBRESOURCE_DATA sSubData = { m_sScene.aafTilePos.data(), (LONG_PTR)(m_sScene.aafTilePos.size() * m_sScene.uVec2Sz), (LONG_PTR)(m_sScene.aafTilePos.size() * m_sScene.uVec2Sz) };
+		D3D12_SUBRESOURCE_DATA sSubData = { m_sScene.aafTilePos.data(), (LONG_PTR)(m_sScene.aafTilePos.size() * m_sScene.uVec4Sz), (LONG_PTR)(m_sScene.aafTilePos.size() * m_sScene.uVec4Sz) };
 		const CD3DX12_RB_TRANSITION sResBr0(m_sD3D.psTileLayout.Get(), eState, D3D12_RESOURCE_STATE_COPY_DEST);
 		const CD3DX12_RB_TRANSITION sResBr1(m_sD3D.psTileLayout.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
 

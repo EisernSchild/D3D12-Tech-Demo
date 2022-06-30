@@ -24,7 +24,7 @@ cbuffer sScene : register(b0)
 	float4 sCamVelo;
 };
 
-Buffer<float2> avTilePos : register(t0);
+Buffer<float4> avTilePos : register(t0);
 
 struct In
 {
@@ -43,7 +43,8 @@ struct Out
 Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID)
 {
 	Out sOut;
-
+	
+	/* MOVE TO COMPUTE SHADER
 	// get hex tile position
 	float2 sInstOffset = avTilePos[uInstIx];
 
@@ -59,6 +60,11 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 
 	// set normal
 	sOut.sNormal = normalize(float3(afHeight.x * afFbmScale.y, .1f, afHeight.z * afFbmScale.y));
+	*/
+
+	// set normal to up meanwhile
+	float3 sPosL = sIn.sPosL;
+	sOut.sNormal = float3(0.f, 1.f, 0.f);
 
 	// transform to homogeneous clip space, pass color
 	sOut.sPosH = mul(float4(sPosL, 1.0f), sWVP);

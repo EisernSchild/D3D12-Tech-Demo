@@ -92,6 +92,8 @@ struct ConstantsScene
 		0.0f, 1.0f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 0.0f, 1.0f);
+	/// hex data (x - number of vertices per hex tile, xyz reserved)
+	XMUINT4 sHexData;
 };
 
 /// <summary>round up to nearest multiple of 256</summary>
