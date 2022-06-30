@@ -115,11 +115,11 @@ signed App_D3D12::InitDirect3D()
 	CreateSceneDHeaps();
 	CreateConstantBuffers();
 	CreateRootSignatures();
+	BuildGeometry();
 
 	if (m_sD3D.bDXRSupport)
 	{
 		CreateDXRStateObject();
-		BuildSceneGeometry();
 		CreateDXRAcceleration();
 		BuildDXRShaderTables();
 
@@ -129,7 +129,6 @@ signed App_D3D12::InitDirect3D()
 	// build d3d tools and resources
 	CreateShaders();
 	CreateTextures();
-	BuildGeometry();
 
 	// execute initialization
 	ThrowIfFailed(m_sD3D.psCmdList->Close());
@@ -369,7 +368,9 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		XMMATRIX sPr = XMLoadFloat4x4(&sProj);
 		XMMATRIX sWVP = sW * sV * sPr;
 
+		// store world view projection and inverse
 		XMStoreFloat4x4(&sConstants.sWVP, XMMatrixTranspose(sWVP));
+		XMStoreFloat4x4(&sConstants.sWVPrInv, XMMatrixInverse(nullptr, XMMatrixTranspose(sWVP)));
 	}
 
 	/// time (x - total, y - delta, z - fps total, w - fps)
@@ -682,16 +683,20 @@ signed App_D3D12::CreateRootSignatures()
 	// DXR root
 	if (m_sD3D.bDXRSupport)
 	{
-		// Global Root Signature, This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
-		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
-		UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+		// tables
+		CD3DX12_DESCRIPTOR_RANGE sUavTable;
+		sUavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 
-		CD3DX12_ROOT_PARAMETER rootParameters[2];
-		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
-		rootParameters[1].InitAsShaderResourceView(0);
+		CD3DX12_DESCRIPTOR_RANGE sCbvTable;
+		sCbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 
-		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(2, rootParameters);
-		ThrowIfFailed(CreateRootSignature(m_sD3D.psDevice.Get(), globalRootSignatureDesc, &m_sD3D.psDXRRootSign));
+		CD3DX12_ROOT_PARAMETER asSlotRootParam[3];
+		asSlotRootParam[0].InitAsDescriptorTable(1, &sUavTable);
+		asSlotRootParam[1].InitAsShaderResourceView(0);
+		asSlotRootParam[2].InitAsDescriptorTable(1, &sCbvTable);
+
+		CD3DX12_ROOT_SIGNATURE_DESC sGlobalDc(3, asSlotRootParam);
+		ThrowIfFailed(CreateRootSignature(m_sD3D.psDevice.Get(), sGlobalDc, &m_sD3D.psDXRRootSign));
 	}
 
 	return APP_FORWARD;
@@ -1056,17 +1061,6 @@ signed App_D3D12::CreateDXRStateObject()
 	return APP_FORWARD;
 }
 
-void App_D3D12::BuildSceneGeometry()
-{
-	auto psDevice = m_sD3D.psDevice.Get();
-
-	Index auIdc[3] = { 0, 1, 2 };
-	AllocateUploadBuffer(psDevice, auIdc, sizeof(auIdc), &m_sD3D.psIB);
-
-	Vertex vertices[3] = { {  0, -0.5f, 1.0f }, { -0.5f, 0.5f, 1.0f }, {  0.5f, 0.5f, 1.0f } };
-	AllocateUploadBuffer(psDevice, vertices, sizeof(vertices), &m_sD3D.psVB);
-}
-
 signed App_D3D12::CreateDXRAcceleration()
 {
 	auto psDevice = m_sD3D.psDevice.Get();
@@ -1076,7 +1070,7 @@ signed App_D3D12::CreateDXRAcceleration()
 	// reset command list
 	psCmdList->Reset(psCmdListAlloc, nullptr);
 
-	/*D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcHexMesh->ViewV();
+	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcHexMesh->ViewV();
 	D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcHexMesh->ViewI();
 
 	D3D12_RAYTRACING_GEOMETRY_DESC sGeoDc = {};
@@ -1088,18 +1082,7 @@ signed App_D3D12::CreateDXRAcceleration()
 	sGeoDc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 	sGeoDc.Triangles.VertexCount = static_cast<UINT>(sVBV.SizeInBytes) / sizeof(VertexPosCol);
 	sGeoDc.Triangles.VertexBuffer.StartAddress = sVBV.BufferLocation;
-	sGeoDc.Triangles.VertexBuffer.StrideInBytes = sVBV.StrideInBytes;*/
-
-	D3D12_RAYTRACING_GEOMETRY_DESC sGeoDc = {};
-	sGeoDc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	sGeoDc.Triangles.IndexBuffer = m_sD3D.psIB->GetGPUVirtualAddress();
-	sGeoDc.Triangles.IndexCount = static_cast<UINT>(m_sD3D.psIB->GetDesc().Width) / sizeof(Index);
-	sGeoDc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
-	sGeoDc.Triangles.Transform3x4 = 0;
-	sGeoDc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-	sGeoDc.Triangles.VertexCount = static_cast<UINT>(m_sD3D.psVB->GetDesc().Width) / sizeof(Vertex);
-	sGeoDc.Triangles.VertexBuffer.StartAddress = m_sD3D.psVB->GetGPUVirtualAddress();
-	sGeoDc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+	sGeoDc.Triangles.VertexBuffer.StrideInBytes = sVBV.StrideInBytes;
 
 	sGeoDc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
@@ -1244,6 +1227,7 @@ void App_D3D12::DoRaytracing()
 	psCmdList->SetDescriptorHeaps(_countof(apsDHeaps), apsDHeaps);
 	psCmdList->SetComputeRootDescriptorTable(0, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::PostMap0Uav]);
 	psCmdList->SetComputeRootShaderResourceView(1, m_sD3D.psTopAccelStruct->GetGPUVirtualAddress());
+	psCmdList->SetComputeRootDescriptorTable(2, m_sD3D.psHeapSRV->GetGPUDescriptorHandleForHeapStart());
 	DispatchRays(psCmdList, m_sD3D.psDXRStateObject.Get(), &sDispDc);
 }
 

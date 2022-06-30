@@ -14,6 +14,12 @@ cbuffer sScene : register(b0)
 	float4 sViewport;
 	/// mouse (x - x position, y - y position, z - buttons (uint), w - wheel (uint))
 	float4 sMouse;
+	/// hexagonal uv (x - x cartesian center, y - y cartesian center, z - u center, w - v center)
+	float4 sHexUV;
+	/// camera position (xyz - position)
+	float4 sCamPos;
+	/// camera velocity 3d vector (xyz - direction)
+	float4 sCamVelo;
 };
 
 Texture2D sTexIn            : register(t0);

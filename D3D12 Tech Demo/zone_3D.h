@@ -86,6 +86,12 @@ struct ConstantsScene
 	XMFLOAT4 sCamPos;
 	/// <summary>camera velocity 3d vector (xyz - direction)</summary>
 	XMFLOAT4 sCamVelo;
+	/// <summary>invers world view projection</summary>
+	XMFLOAT4X4 sWVPrInv = XMFLOAT4X4(
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f);
 };
 
 /// <summary>round up to nearest multiple of 256</summary>

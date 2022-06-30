@@ -70,8 +70,6 @@ protected:
 	static signed BuildGeometry();
 	/// <summary>Create a pipeline state object for DXR</summary>
 	static signed CreateDXRStateObject();
-	/// <summary>Sample geometry triange... to be deleted</summary>
-	static void BuildSceneGeometry();
 	/// <summary>Create the acceleration structures for DXR</summary>
 	static signed CreateDXRAcceleration();
 	/// <summary>Create the shader tables for DXR</summary>
@@ -84,10 +82,6 @@ protected:
 	static void RenderMap2Backbuffer();
 	/// <summary>Double back buffer ( = 2 )</summary>
 	static constexpr int nSwapchainBufferN = 2;
-
-	// Geometry.. to be deleted
-	using Index = uint16_t;
-	struct Vertex { float v1, v2, v3; };
 
 	static struct D3D12_Fields
 	{
@@ -167,10 +161,6 @@ protected:
 		ComPtr<ID3D12Resource> psHitGroupTable;
 		/// <summary>ray gen shader table</summary>
 		ComPtr<ID3D12Resource> psRayGenTable;
-		/// <summary>sample index buffer, to be deleted</summary>
-		ComPtr<ID3D12Resource> psIB;
-		/// <summary>sample vertex buffer, to be deleted</summary>
-		ComPtr<ID3D12Resource> psVB;
 	} m_sD3D;
 
 	static struct SceneData 
