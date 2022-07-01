@@ -44,7 +44,7 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 {
 	Out sOut;
 	
-	/* MOVE TO COMPUTE SHADER
+	/* moved to compute shader... leave here for testing
 	// get hex tile position
 	float2 sInstOffset = avTilePos[uInstIx];
 
@@ -62,9 +62,9 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 	sOut.sNormal = normalize(float3(afHeight.x * afFbmScale.y, .1f, afHeight.z * afFbmScale.y));
 	*/
 
-	// set normal to up meanwhile
+	// input color is our normal here... rename by time
 	float3 sPosL = sIn.sPosL;
-	sOut.sNormal = float3(0.f, 1.f, 0.f);
+	sOut.sNormal = sIn.sCol.xyz;
 
 	// transform to homogeneous clip space, pass color
 	sOut.sPosH = mul(float4(sPosL, 1.0f), sWVP);
