@@ -39,7 +39,7 @@ XMFLOAT3 operator*(const XMFLOAT3& sMultiplier, const float& fMultiplicant) {
 signed App_D3D12::GxInit(AppData& sData)
 {
 	OutputDebugStringA("App_D3D12::GxInit");
-	return InitDirect3D();
+	return InitDirect3D(sData);
 }
 
 signed App_D3D12::GxRelease(AppData& sData)
@@ -48,7 +48,7 @@ signed App_D3D12::GxRelease(AppData& sData)
 	return APP_FORWARD;
 }
 
-signed App_D3D12::InitDirect3D()
+signed App_D3D12::InitDirect3D(AppData& sData)
 {
 	ComPtr<IDXGIFactory4> psDxgiFactory = nullptr;
 
@@ -130,7 +130,8 @@ signed App_D3D12::InitDirect3D()
 	CreateShaders();
 	CreateTextures();
 
-	// set basic hex tile offsets
+	// init  scene constants and set basic hex tile offsets
+	UpdateConstants(sData);
 	OffsetTiles(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(), m_sD3D.psPsoCsHexTrans.Get());
 
 	// execute initialization
@@ -448,7 +449,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		// set hex center as old for next frame
 		m_sScene.sHexXYc = sXY;
 
-		XMVECTOR sHexData = XMVectorSet((float)m_sScene.uBaseVtxN, 19, 0, 0);
+		XMVECTOR sHexData = XMVectorSet((float)m_sScene.uBaseVtxN, 0, 0, 0);
 		XMStoreUInt4(&m_sScene.sConstants.sHexData, sHexData);
 	}
 
@@ -493,12 +494,7 @@ signed App_D3D12::Draw(const AppData& sData)
 	// reset
 	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
 	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), m_sD3D.psPSO->Get()));
-
-	// and update the constant buffer ( move that later... )
-	UpdateHexOffsets(D3D12_RESOURCE_STATE_GENERIC_READ);
-
-	//OffsetTiles(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(), m_sD3D.psPsoCsHexTrans.Get());
-
+	
 	// transit to render target
 	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -530,6 +526,10 @@ signed App_D3D12::Draw(const AppData& sData)
 	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(1, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
 	//m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), m_sD3D.pcHexMesh->Instances_N(), 0, 0, 0);
 	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), 1, 0, 0, 0);
+
+	// update the hex tiles, first the offsets, then the tiles ( move that later... )
+	UpdateHexOffsets(D3D12_RESOURCE_STATE_GENERIC_READ);
+	OffsetTiles(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(), m_sD3D.psPsoCsHexTrans.Get());
 
 	// execute post processing
 	ExecutePost(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(),

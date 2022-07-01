@@ -23,9 +23,6 @@
     <ClCompile Include="..\..\app_D3D12.cpp">
       <Filter>app</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\app_TechDemo.cpp">
-      <Filter>app</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\app.h">

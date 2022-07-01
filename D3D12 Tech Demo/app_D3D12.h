@@ -34,7 +34,7 @@ protected:
 
 protected:
 	/// <summary>Init D3D12 device</summary>
-	static signed InitDirect3D();
+	static signed InitDirect3D(AppData& sData);
 	/// <summary>Init D3D12 command objects</summary>
 	static signed CreateCommandObjects();
 	/// <summary>Init DXGI swap chain</summary>

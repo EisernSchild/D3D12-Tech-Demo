@@ -33,21 +33,16 @@ struct Vertex
 };
 
 Buffer<float4> avTilePos : register(t0);
-// Texture2D sTexIn            : register(t0);
 RWStructuredBuffer<Vertex> sVBOut : register(u0);
 
 [numthreads(1, 1, 1)]
 void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThreadID)
 {
-	uint uIx = uint(sDispatchTID.x) / uint(19);
-	uint uIxB = uint(sDispatchTID.x) % uint(19);
+	// get tile index and base vertex index (= tile 0)
+	uint uTileI = uint(sDispatchTID.x) / uint(sHexData.x);
+	uint uBaseI = uint(sDispatchTID.x) % uint(sHexData.x);
 
-	sVBOut[sDispatchTID.x + 19].sPosL.y = sVBOut[uIxB].sPosL.y;
-	sVBOut[sDispatchTID.x + 19].sPosL.xz = sVBOut[uIxB].sPosL.xz + avTilePos[uIx].xy;
-
-	/*uint uIx = uint(sDispatchTID.x) / uint(sHexData.x);
-	uint uIxB = uint(sDispatchTID.x) % uint(sHexData.x);
-
-	sVBOut[sDispatchTID.x + sHexData.x].sPosL.y = sVBOut[uIxB].sPosL.y;
-	sVBOut[sDispatchTID.x + sHexData.x].sPosL.xz = sVBOut[uIxB].sPosL.xz + avTilePos[uIx].xy;*/
+	// the first tile is our base tile, set new position based on this tile
+	sVBOut[sDispatchTID.x + sHexData.x].sPosL.y = sVBOut[uBaseI].sPosL.y;
+	sVBOut[sDispatchTID.x + sHexData.x].sPosL.xz = sVBOut[uBaseI].sPosL.xz + avTilePos[uTileI].xy;
 }
