@@ -443,6 +443,9 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 				m_sScene.aafTilePos[uIx].y = m_sScene.sHexXYc.y + sTileXY.y;
 				m_sScene.aafTilePos[uIx].x += sXY.x - m_sScene.sHexXYc.x;
 				m_sScene.aafTilePos[uIx].y += sXY.y - m_sScene.sHexXYc.y;
+				 
+				// add to update tiles
+				m_sScene.aafTilePosUpdate.push_back(m_sScene.aafTilePos[uIx]);
 			}
 		}
 
@@ -602,8 +605,11 @@ void App_D3D12::OffsetTiles(ID3D12GraphicsCommandList* psCmdList,
 	psCmdList->SetComputeRootDescriptorTable(2, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::MeshVtcUav]);
 
 	// dispatch
-	UINT uNumGroupsX = (UINT)m_sScene.uInstN * m_sScene.uBaseVtxN;
+	UINT uNumGroupsX = (UINT)m_sScene.aafTilePosUpdate.size() * m_sScene.uBaseVtxN;
 	psCmdList->Dispatch(uNumGroupsX, 1, 1);
+
+	// once dispatched we clear the update vector
+	m_sScene.aafTilePosUpdate.clear();
 
 	// transit second map to generic read
 	CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, m_sD3D.pcHexMesh->Vertex_Buffer(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
@@ -1072,13 +1078,15 @@ signed App_D3D12::BuildGeometry()
 				// move
 				sInstOffset = HexNext(m_sScene.fTileSz, uOffset) * (float)uAmbit;
 				if (uIx > uOffset)
-					sInstOffset = sInstOffset + HexNext(m_sScene.fTileSz, uOffset + 2) * (float)(uIx / 6);
-			}
-			m_sScene.aafTilePos.push_back(XMFLOAT4(sInstOffset.x, sInstOffset.y, 0.f, 0.f));
+					sInstOffset = sInstOffset + HexNext(m_sScene.fTileSz, uOffset + 2) * (float)(uIx / 6);							
+			}			
+
+			// store the tile index in z register as float for compute shader
+			m_sScene.aafTilePos.push_back(XMFLOAT4(sInstOffset.x, sInstOffset.y, (float)uInstIx, 0.f));
 		}
 
-		// backup initial positions
-		m_sScene.aafTilePosInit.insert(m_sScene.aafTilePosInit.begin(), m_sScene.aafTilePos.begin(), m_sScene.aafTilePos.end());
+		// initially we need to update all tile positions
+		m_sScene.aafTilePosUpdate.insert(m_sScene.aafTilePosUpdate.begin(), m_sScene.aafTilePos.begin(), m_sScene.aafTilePos.end());
 
 		// and update the constant buffer
 		UpdateHexOffsets(D3D12_RESOURCE_STATE_COPY_DEST);

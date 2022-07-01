@@ -197,8 +197,8 @@ protected:
 		unsigned uBaseVtxN = 0;
 		/// <summary>hex tiles positions (current)</summary>
 		std::vector<XMFLOAT4> aafTilePos;
-		/// <summary>hex tiles positions (initial)</summary>
-		std::vector<XMFLOAT4> aafTilePosInit;
+		/// <summary>hex tiles positions (to be updated)</summary>
+		std::vector<XMFLOAT4> aafTilePosUpdate;
 		/// <summary>constant hex tile size</summary>
 		const float fTileSz = 1.f;
 		/// <summary>constant hex tile minimum width</summary>
@@ -228,7 +228,7 @@ private:
 	static void UpdateHexOffsets(D3D12_RESOURCE_STATES eState)
 	{
 		// update the constant buffer for the tiles offsets
-		D3D12_SUBRESOURCE_DATA sSubData = { m_sScene.aafTilePos.data(), (LONG_PTR)(m_sScene.aafTilePos.size() * m_sScene.uVec4Sz), (LONG_PTR)(m_sScene.aafTilePos.size() * m_sScene.uVec4Sz) };
+		D3D12_SUBRESOURCE_DATA sSubData = { m_sScene.aafTilePosUpdate.data(), (LONG_PTR)(m_sScene.aafTilePosUpdate.size() * m_sScene.uVec4Sz), (LONG_PTR)(m_sScene.aafTilePosUpdate.size() * m_sScene.uVec4Sz) };
 		const CD3DX12_RB_TRANSITION sResBr0(m_sD3D.psTileLayout.Get(), eState, D3D12_RESOURCE_STATE_COPY_DEST);
 		const CD3DX12_RB_TRANSITION sResBr1(m_sD3D.psTileLayout.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
 
