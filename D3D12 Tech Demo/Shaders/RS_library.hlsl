@@ -107,39 +107,34 @@ void IntersectionShader()
 	float fThit = 0.1f;
 	ProceduralPrimitiveAttributes attr = (ProceduralPrimitiveAttributes)0;
 
-	// get local origin in cube (-1, -1, -1) -> (1, 1, 1)
+	// get origin
 	float3 vOri = ObjectRayOrigin();
 	float3 vOriA = abs(vOri);
-	float3 vOriL = vOri / max(max(vOriA.x, vOriA.y), vOriA.z);
-
-	// max intersection distance
-	const float fMaxDist = distance(float3(1., 1., 1.), float3(-1., -1., -1.));
+	float3 vOriL = vOri;
 
 	// direction normalized
 	float3 vDir = normalize(ObjectRayDirection());
 
-	// raymarch through cube (-1, -1, -1) -> (1, 1, 1)
-	const int nRaySteps = 100;
-	const float fRayStepDist = fMaxDist / float(nRaySteps);
-	const float3 vStep = vDir * fRayStepDist;
-	for (int n = 0; n < nRaySteps; n++)
+	// raymarch 
+	const int nMaxRaySteps = 40;
+	const float fInitialRayStepDist = 1.f / float(nMaxRaySteps);
+	float3 vStep = vDir * fInitialRayStepDist;
+	for (int n = 0; n < nMaxRaySteps; n++)
 	{
-		// raymarch step
-		vOriL += vStep;
-
-		// out of bounds ?
-		if ((abs(vOriL.x) > 1.f) || (abs(vOriL.y) > 1.f) || (abs(vOriL.z) > 1.f))
-			return;
-
 		// get terrain height, this should be precomputed in heighmap
 		float fTerrainY =
 			fbm(vOriL.xz * 0.1f, 1.f);
-
-		if (vOriL.y < fTerrainY)
+		
+		fThit = abs(vOriL.y - fTerrainY);
+		if (fThit < .1f)
 		{
 			attr.vNormal = float3(fTerrainY, fTerrainY, fTerrainY);
 			ReportHit(fThit, 0, attr);
 			return;
 		}
+
+		// raymarch step
+		vStep = vDir * fThit;
+		vOriL += vStep;
 	}
 }

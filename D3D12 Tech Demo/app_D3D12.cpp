@@ -351,7 +351,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 			m_sScene.fPitch = ((float)sState.Gamepad.sThumbRY / 32767.f) * XM_PIDIV2;
 		}
 
-		// word view projection
+		// word view projection...
 		XMFLOAT4X4 sWorld, sView, sProj;
 		XMStoreFloat4x4(&sWorld, XMMatrixIdentity());
 		XMMATRIX sP = XMMatrixPerspectiveFovLH(0.25f * XM_PI, static_cast<float>(m_sClientSize.nW) / static_cast<float>(m_sClientSize.nH), 1.0f, 1000.0f);
@@ -1112,11 +1112,12 @@ signed App_D3D12::BuildGeometry()
 	}
 
 	// axis-aligned bounding box
+	float fMaxSceneBorder = 1000.f;
 	{
 		D3D12_RAYTRACING_AABB sAABBDc =
 		{
-			-1.f, -1.f, -1.f,
-			 1.f,  1.f,  1.f
+			-fMaxSceneBorder, -fMaxSceneBorder, -fMaxSceneBorder,
+			 fMaxSceneBorder,  fMaxSceneBorder,  fMaxSceneBorder
 		};
 		AllocateUploadBuffer(m_sD3D.psDevice.Get(), &sAABBDc, sizeof(sAABBDc), &m_sD3D.psAABB, L"AABB");
 	}
