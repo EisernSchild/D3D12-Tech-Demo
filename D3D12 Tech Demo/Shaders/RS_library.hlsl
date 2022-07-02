@@ -86,13 +86,33 @@ void RayGenerationShader()
 	RenderTarget[DispatchRaysIndex().xy] = sPay.vColor;
 }
 
+// phong constants
+static const float4 sDiffuseAlbedo = { .9f, .9f, 1.f, 1.0f };
+static const float3 sFresnelR0 = { 0.01f, 0.01f, 0.01f };
+static const float4 sAmbientLight = { 0.3f, 0.4f, 0.5f, 1.0f };
+static const float fRoughness = 0.15f;
+static const float3 sStrength = { .9f, .9f, .9f };
+static const float3 sLightVec = { 1.f, -.6f, .5f };
+
 [shader("closesthit")]
 void ClosestHitShader(inout RayPayload sPay, in ProceduralPrimitiveAttributes attr)
 {
-	/*float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-	payload.vColor = float4(barycentrics, 1);*/
-	
-	sPay.vColor = float4(attr.vNormal, 1.f);// float4(0.8f, 0.8f, 0.6f, 1.f);
+	float fFbmScale = .05f, fFbmScaleSimplex = .5f;
+	float2 sUV = attr.vNormal.xz;
+
+	// get base height color
+	float fHeight = max((fbm(sUV * fFbmScale, .5) + 1.) * .5f, 0.f);
+	float3 sDiffuse = lerp(float3(1., 1., 1.) - sDiffuseAlbedo.xyz, sDiffuseAlbedo.xyz, fHeight);
+
+	// draw rocks
+	float fRocks = frac_noise_simplex(sUV * fFbmScaleSimplex * .2);
+	sDiffuse = lerp(float3(.1, .1, .1), sDiffuse, max(fHeight, fRocks));
+
+	// draw grassland
+	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex);
+	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), max(1.0f - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
+
+	sPay.vColor = float4(sDiffuse, 1.f);
 }
 
 [shader("miss")]
@@ -104,6 +124,7 @@ void MissShader(inout RayPayload sPay)
 [shader("intersection")]
 void IntersectionShader()
 {
+	const float2 afFbmScale = float2(.05f, 10.f);
 	float fThit = 0.1f;
 	ProceduralPrimitiveAttributes attr = (ProceduralPrimitiveAttributes)0;
 
@@ -117,24 +138,32 @@ void IntersectionShader()
 
 	// raymarch 
 	const int nMaxRaySteps = 40;
-	const float fInitialRayStepDist = 1.f / float(nMaxRaySteps);
-	float3 vStep = vDir * fInitialRayStepDist;
+	float fStepAdjust = .6f;
+	float3 vStep = vDir;
+	float fThitPrev = fThit;
 	for (int n = 0; n < nMaxRaySteps; n++)
 	{
 		// get terrain height, this should be precomputed in heighmap
 		float fTerrainY =
-			fbm(vOriL.xz * 0.1f, 1.f);
+			fbm(vOriL.xz * afFbmScale.x, 1.f) * afFbmScale.y;
 		
-		fThit = abs(vOriL.y - fTerrainY);
-		if (fThit < .1f)
+		fThitPrev = fThit;
+		fThit = vOriL.y - fTerrainY;
+		if (fThit < 0.1f)
 		{
-			attr.vNormal = float3(fTerrainY, fTerrainY, fTerrainY);
+			if (fThit < 0.f)
+			{
+				fThit = abs(fThit);
+				vOriL -= vStep * (fThit / (fThit + fThitPrev));
+				fThit = 0.01f;
+			}
+			attr.vNormal = float3(vOriL.x, fTerrainY, vOriL.z);
 			ReportHit(fThit, 0, attr);
 			return;
 		}
 
 		// raymarch step
-		vStep = vDir * fThit;
+		vStep = vDir * abs(fThit) * fStepAdjust;
 		vOriL += vStep;
 	}
 }
