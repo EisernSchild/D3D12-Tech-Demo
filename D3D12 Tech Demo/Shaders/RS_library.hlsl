@@ -3,6 +3,8 @@
 // 
 // SPDX-License-Identifier: MIT
 
+#include"fbm.hlsli"
+
 /// basic scene constant buffer
 cbuffer sScene : register(b0)
 {
@@ -90,7 +92,7 @@ void ClosestHitShader(inout RayPayload sPay, in ProceduralPrimitiveAttributes at
 	/*float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 	payload.vColor = float4(barycentrics, 1);*/
 	
-	sPay.vColor = float4(0.8f, 0.8f, 0.6f, 1.f);
+	sPay.vColor = float4(attr.vNormal, 1.f);// float4(0.8f, 0.8f, 0.6f, 1.f);
 }
 
 [shader("miss")]
@@ -104,5 +106,40 @@ void IntersectionShader()
 {
 	float fThit = 0.1f;
 	ProceduralPrimitiveAttributes attr = (ProceduralPrimitiveAttributes)0;
-	ReportHit(fThit, 0, attr);
+
+	// get local origin in cube (-1, -1, -1) -> (1, 1, 1)
+	float3 vOri = ObjectRayOrigin();
+	float3 vOriA = abs(vOri);
+	float3 vOriL = vOri / max(max(vOriA.x, vOriA.y), vOriA.z);
+
+	// max intersection distance
+	const float fMaxDist = distance(float3(1., 1., 1.), float3(-1., -1., -1.));
+
+	// direction normalized
+	float3 vDir = normalize(ObjectRayDirection());
+
+	// raymarch through cube (-1, -1, -1) -> (1, 1, 1)
+	const int nRaySteps = 100;
+	const float fRayStepDist = fMaxDist / float(nRaySteps);
+	const float3 vStep = vDir * fRayStepDist;
+	for (int n = 0; n < nRaySteps; n++)
+	{
+		// raymarch step
+		vOriL += vStep;
+
+		// out of bounds ?
+		if ((abs(vOriL.x) > 1.f) || (abs(vOriL.y) > 1.f) || (abs(vOriL.z) > 1.f))
+			return;
+
+		// get terrain height, this should be precomputed in heighmap
+		float fTerrainY =
+			fbm(vOriL.xz * 0.1f, 1.f);
+
+		if (vOriL.y < fTerrainY)
+		{
+			attr.vNormal = float3(fTerrainY, fTerrainY, fTerrainY);
+			ReportHit(fThit, 0, attr);
+			return;
+		}
+	}
 }
