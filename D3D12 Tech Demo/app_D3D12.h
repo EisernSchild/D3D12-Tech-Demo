@@ -190,7 +190,7 @@ protected:
 		/// <summary>camera pitch, yaw</summary>
 		float fYaw = 0.f, fPitch = 0.f;
 		/// <summary>number of hex ambits (or "circles") around the main hexagon</summary>
-		const unsigned uAmbitN = 48;
+		const unsigned uAmbitN = 1;
 		/// <summary>number of hex tiles (or instances), to be computed</summary>
 		unsigned uInstN = 1;
 		/// <summary>number of vertices of one hex tile, to be computed</summary>

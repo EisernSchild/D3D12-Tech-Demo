@@ -88,7 +88,7 @@ signed App_D3D12::InitDirect3D(AppData& sData)
 	}
 
 	// uncomment to force BlinPhong
-	m_sD3D.bDXRSupport = false;
+	// m_sD3D.bDXRSupport = false;
 
 	// get descriptor sizes
 	m_sD3D.uRtvDcSz = m_sD3D.psDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -117,15 +117,6 @@ signed App_D3D12::InitDirect3D(AppData& sData)
 	CreateRootSignatures();
 	BuildGeometry();
 
-	if (m_sD3D.bDXRSupport)
-	{
-		CreateDXRStateObject();
-		CreateDXRAcceleration();
-		BuildDXRShaderTables();
-
-		ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), nullptr));
-	}
-
 	// build d3d tools and resources
 	CreateShaders();
 	CreateTextures();
@@ -140,7 +131,18 @@ signed App_D3D12::InitDirect3D(AppData& sData)
 	m_sD3D.psCmdQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	// ...and sync
-	return FlushCommandQueue();
+	ThrowIfFailed(FlushCommandQueue());
+
+	if (m_sD3D.bDXRSupport)
+	{
+		CreateDXRStateObject();
+		CreateDXRAcceleration();
+		BuildDXRShaderTables();
+
+		ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), nullptr));
+	}
+		
+	return APP_FORWARD;
 }
 
 signed App_D3D12::CreateCommandObjects()
