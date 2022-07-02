@@ -65,6 +65,12 @@ struct VertexPosCol
 	XMFLOAT4 sColor;
 };
 
+/// <summary>hlsl attribute structure</summary>
+struct ProceduralPrimitiveAttributes
+{
+	XMFLOAT3 vNormal;
+};
+
 /// <summary>Simple Sample constants</summary>
 struct ConstantsScene
 {

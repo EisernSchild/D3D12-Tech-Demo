@@ -27,7 +27,11 @@ cbuffer sScene : register(b0)
 RaytracingAccelerationStructure Scene : register(t0);
 RWTexture2D<float4> RenderTarget                : register(u0);
 
-typedef BuiltInTriangleIntersectionAttributes MyAttributes;
+struct ProceduralPrimitiveAttributes
+{
+	float3 vNormal;
+};
+
 struct RayPayload
 {
 	float4 vColor;
@@ -81,14 +85,24 @@ void RayGenerationShader()
 }
 
 [shader("closesthit")]
-void ClosestHitShader(inout RayPayload payload, in MyAttributes attr)
+void ClosestHitShader(inout RayPayload sPay, in ProceduralPrimitiveAttributes attr)
 {
-	float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-	payload.vColor = float4(barycentrics, 1);
+	/*float3 barycentrics = float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
+	payload.vColor = float4(barycentrics, 1);*/
+	
+	sPay.vColor = float4(0.8f, 0.8f, 0.6f, 1.f);
 }
 
 [shader("miss")]
-void MissShader(inout RayPayload payload)
+void MissShader(inout RayPayload sPay)
 {
-	payload.vColor = float4(0.0f, 0.2f, 0.4f, 1.f);
+	sPay.vColor = float4(0.0f, 0.2f, 0.4f, 1.f);
+}
+
+[shader("intersection")]
+void IntersectionShader()
+{
+	float fThit = 0.1f;
+	ProceduralPrimitiveAttributes attr = (ProceduralPrimitiveAttributes)0;
+	ReportHit(fThit, 0, attr);
 }

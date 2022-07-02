@@ -10,6 +10,7 @@ const wchar_t* s_atHitGroup = L"HitGroup";
 const wchar_t* s_atRaygen = L"RayGenerationShader";
 const wchar_t* s_atClosestHit = L"ClosestHitShader";
 const wchar_t* s_atMiss = L"MissShader";
+const wchar_t* s_atIntersection = L"IntersectionShader";
 
 HWND App_Windows::m_pHwnd = nullptr;
 App_Windows::Client App_Windows::m_sClientSize;
@@ -141,7 +142,7 @@ signed App_D3D12::InitDirect3D(AppData& sData)
 
 		ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), nullptr));
 	}
-		
+
 	return APP_FORWARD;
 }
 
@@ -445,7 +446,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 				m_sScene.aafTilePos[uIx].y = m_sScene.sHexXYc.y + sTileXY.y;
 				m_sScene.aafTilePos[uIx].x += sXY.x - m_sScene.sHexXYc.x;
 				m_sScene.aafTilePos[uIx].y += sXY.y - m_sScene.sHexXYc.y;
-				 
+
 				// add to update tiles
 				m_sScene.aafTilePosUpdate.push_back(m_sScene.aafTilePos[uIx]);
 			}
@@ -499,7 +500,7 @@ signed App_D3D12::Draw(const AppData& sData)
 	// reset
 	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
 	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), m_sD3D.psPSO->Get()));
-	
+
 	// transit to render target
 	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -592,7 +593,7 @@ void App_D3D12::ExecutePost(ID3D12GraphicsCommandList* psCmdList,
 void App_D3D12::OffsetTiles(ID3D12GraphicsCommandList* psCmdList,
 	ID3D12RootSignature* psRootSign,
 	ID3D12PipelineState* psPSO)
-{	
+{
 	// transit to unordered access
 	CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, m_sD3D.pcHexMesh->Vertex_Buffer(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
@@ -1080,8 +1081,8 @@ signed App_D3D12::BuildGeometry()
 				// move
 				sInstOffset = HexNext(m_sScene.fTileSz, uOffset) * (float)uAmbit;
 				if (uIx > uOffset)
-					sInstOffset = sInstOffset + HexNext(m_sScene.fTileSz, uOffset + 2) * (float)(uIx / 6);							
-			}			
+					sInstOffset = sInstOffset + HexNext(m_sScene.fTileSz, uOffset + 2) * (float)(uIx / 6);
+			}
 
 			// store the tile index in z register as float for compute shader
 			m_sScene.aafTilePos.push_back(XMFLOAT4(sInstOffset.x, sInstOffset.y, (float)uInstIx, 0.f));
@@ -1110,6 +1111,16 @@ signed App_D3D12::BuildGeometry()
 		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psTileLayout.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
 	}
 
+	// axis-aligned bounding box
+	{
+		D3D12_RAYTRACING_AABB sAABBDc =
+		{
+			-1.f, -1.f, -1.f,
+			 1.f,  1.f,  1.f
+		};
+		AllocateUploadBuffer(m_sD3D.psDevice.Get(), &sAABBDc, sizeof(sAABBDc), &m_sD3D.psAABB, L"AABB");
+	}
+
 	return APP_FORWARD;
 }
 
@@ -1124,16 +1135,19 @@ signed App_D3D12::CreateDXRStateObject()
 	psLibrary->DefineExport(s_atRaygen);
 	psLibrary->DefineExport(s_atClosestHit);
 	psLibrary->DefineExport(s_atMiss);
+	psLibrary->DefineExport(s_atIntersection);
 
 	// set hit group sub object
 	auto pcHitG = sObjectDc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
 	pcHitG->SetClosestHitShaderImport(s_atClosestHit);
+	pcHitG->SetIntersectionShaderImport(s_atIntersection);
 	pcHitG->SetHitGroupExport(s_atHitGroup);
-	pcHitG->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+	pcHitG->SetHitGroupType(D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
 
 	// set shader config sub object (float4 color float2 barycentrics)
 	auto pcShaderConf = sObjectDc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-	pcShaderConf->Config(4 * sizeof(float), 2 * sizeof(float));
+	UINT uAttributeSize = sizeof(struct ProceduralPrimitiveAttributes);
+	pcShaderConf->Config(4 * sizeof(float), uAttributeSize);
 
 	// set global root signature sub object
 	auto pcGlobalRootSign = sObjectDc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
@@ -1157,21 +1171,35 @@ signed App_D3D12::CreateDXRAcceleration()
 	// reset command list
 	psCmdList->Reset(psCmdListAlloc, nullptr);
 
-	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcHexMesh->ViewV();
-	D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcHexMesh->ViewI();
-
 	D3D12_RAYTRACING_GEOMETRY_DESC sGeoDc = {};
-	sGeoDc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	sGeoDc.Triangles.IndexBuffer = sIBV.BufferLocation;
-	sGeoDc.Triangles.IndexCount = static_cast<UINT>(sIBV.SizeInBytes) / sizeof(UINT16);
-	sGeoDc.Triangles.IndexFormat = sIBV.Format;
-	sGeoDc.Triangles.Transform3x4 = 0;
-	sGeoDc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-	sGeoDc.Triangles.VertexCount = static_cast<UINT>(sVBV.SizeInBytes) / sizeof(VertexPosCol);
-	sGeoDc.Triangles.VertexBuffer.StartAddress = sVBV.BufferLocation;
-	sGeoDc.Triangles.VertexBuffer.StrideInBytes = sVBV.StrideInBytes;
 
-	sGeoDc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+	if (1)
+	{
+		/// aabbs
+		sGeoDc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
+		sGeoDc.AABBs.AABBCount = 1;
+		sGeoDc.AABBs.AABBs.StrideInBytes = sizeof(D3D12_RAYTRACING_AABB);
+		sGeoDc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+		sGeoDc.AABBs.AABBs.StartAddress = m_sD3D.psAABB->GetGPUVirtualAddress();
+	}
+	else
+	{
+		// triangle.. keep code as example
+		D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcHexMesh->ViewV();
+		D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcHexMesh->ViewI();
+
+		sGeoDc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+		sGeoDc.Triangles.IndexBuffer = sIBV.BufferLocation;
+		sGeoDc.Triangles.IndexCount = static_cast<UINT>(sIBV.SizeInBytes) / sizeof(UINT16);
+		sGeoDc.Triangles.IndexFormat = sIBV.Format;
+		sGeoDc.Triangles.Transform3x4 = 0;
+		sGeoDc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+		sGeoDc.Triangles.VertexCount = static_cast<UINT>(sVBV.SizeInBytes) / sizeof(VertexPosCol);
+		sGeoDc.Triangles.VertexBuffer.StartAddress = sVBV.BufferLocation;
+		sGeoDc.Triangles.VertexBuffer.StrideInBytes = sVBV.StrideInBytes;
+
+		sGeoDc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+	}
 
 	// get required sizes - top
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO sTopInfoDc = {};
@@ -1249,7 +1277,6 @@ void App_D3D12::BuildDXRShaderTables()
 	auto psDevice = m_sD3D.psDevice.Get();
 	UINT uIdSz = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
 	void* pvRayGenId, * pvMissId, * pvHitGroupId;
-
 	auto GetShaderIdentifiers = [&](auto* psObjectProp)
 	{
 		pvRayGenId = psObjectProp->GetShaderIdentifier(s_atRaygen);

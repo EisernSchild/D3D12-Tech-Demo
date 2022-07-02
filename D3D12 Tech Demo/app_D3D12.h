@@ -167,6 +167,10 @@ protected:
 		ComPtr<ID3D12Resource> psHitGroupTable;
 		/// <summary>ray gen shader table</summary>
 		ComPtr<ID3D12Resource> psRayGenTable;
+		/// <summary>intersection shader table</summary>
+		ComPtr<ID3D12Resource> psIntersectionTable;
+		/// <summary>axis-aligned bounding box</summary>
+		ComPtr<ID3D12Resource> psAABB;
 	} m_sD3D;
 
 	static struct SceneData 
