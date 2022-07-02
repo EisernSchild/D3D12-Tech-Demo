@@ -94,14 +94,54 @@ static const float fRoughness = 0.15f;
 static const float3 sStrength = { .9f, .9f, .9f };
 static const float3 sLightVec = { 1.f, -.6f, .5f };
 
+float CalcAttenuation(float d, float falloffStart, float falloffEnd)
+{
+	// Linear falloff.
+	return saturate((falloffEnd - d) / (falloffEnd - falloffStart));
+}
+
+// Schlick gives an approximation to Fresnel reflectance (see pg. 233 "Real-Time Rendering 3rd Ed.").
+// R0 = ( (n-1)/(n+1) )^2, where n is the index of refraction.
+float3 SchlickFresnel(float3 R0, float3 normal, float3 lightVec)
+{
+	float cosIncidentAngle = saturate(dot(normal, lightVec));
+
+	float f0 = 1.0f - cosIncidentAngle;
+	float3 reflectPercent = R0 + (1.0f - R0) * (f0 * f0 * f0 * f0 * f0);
+
+	return reflectPercent;
+}
+
+// BlinnPhong method by Frank Luna (C) 2015 All Rights Reserved.
+float3 BlinnPhong(float3 sDiffuse, float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, float fSpec)
+{
+	const float m = (1.f - fRoughness) * 256.0f;
+	float3 halfVec = normalize(toEye + lightVec);
+
+	float roughnessFactor = (m + 8.0f) * pow(max(dot(halfVec, normal), 0.0f), m) / 8.0f;
+	float3 fresnelFactor = SchlickFresnel(sFresnelR0, halfVec, lightVec);
+
+	float3 specAlbedo = fresnelFactor * roughnessFactor;
+
+	// Our spec formula goes outside [0,1] range, but we are 
+	// doing LDR rendering.  So scale it down a bit.
+	specAlbedo = (specAlbedo / (specAlbedo + 1.0f)) * fSpec;
+
+	return (sDiffuse + specAlbedo) * lightStrength;
+}
+
 [shader("closesthit")]
 void ClosestHitShader(inout RayPayload sPay, in ProceduralPrimitiveAttributes attr)
 {
 	float fFbmScale = .05f, fFbmScaleSimplex = .5f;
+	const float2 afFbmScale = float2(.05f, 10.f);
 	float2 sUV = attr.vNormal.xz;
 
+	// this normal method is a mess... do that mathematically correct
+	float3 afHeight = fbm_normal(sUV * fFbmScale, .5f);
+
 	// get base height color
-	float fHeight = max((fbm(sUV * fFbmScale, .5) + 1.) * .5f, 0.f);
+	float fHeight = max((afHeight.y + 1.) * .5f, 0.f);
 	float3 sDiffuse = lerp(float3(1., 1., 1.) - sDiffuseAlbedo.xyz, sDiffuseAlbedo.xyz, fHeight);
 
 	// draw rocks
@@ -111,8 +151,18 @@ void ClosestHitShader(inout RayPayload sPay, in ProceduralPrimitiveAttributes at
 	// draw grassland
 	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex);
 	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), max(1.0f - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
+		
+	// set normal
+	float3 sNormal = normalize(float3(afHeight.x * afFbmScale.y, .5f, afHeight.z * afFbmScale.y));
+	
+	// to camera vector, ambient light
+	float3 sToEyeW = normalize(sCamPos.xyz - attr.vNormal);
+	float4 sAmbient = sAmbientLight * float4(sDiffuse, 1.f);
+	float fNdotL = max(dot(sLightVec, sNormal), 0.1f);
+	float3 sStr = sStrength * fNdotL;
 
-	sPay.vColor = float4(sDiffuse, 1.f);
+	// do phong
+	sPay.vColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sNormal, sToEyeW, smoothstep(.5, .55, abs(fHeight))), 1.f);
 }
 
 [shader("miss")]

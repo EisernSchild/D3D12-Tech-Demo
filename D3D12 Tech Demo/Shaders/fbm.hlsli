@@ -192,13 +192,13 @@ float fbm(in float2 vX, in float fH)
 	return fT;
 }
 
-float3 fbm_normal(in float2 vX)
+float3 fbm_normal(in float2 vX, in float fH)
 {
 	float3 vV =
 		float3(
-			fbm(vX - float2(-.1, .0), 1.) - fbm(vX - float2(.1, .0), 1.),
-			fbm(vX, 1.),
-			fbm(vX - float2(.0, -.1), 1.) - fbm(vX - float2(.0, .1), 1.)
+			fbm(vX - float2(-.1, .0), fH) - fbm(vX - float2(.1, .0), fH),
+			fbm(vX, fH),
+			fbm(vX - float2(.0, -.1), fH) - fbm(vX - float2(.0, .1), fH)
 			);
 	return vV;
 }

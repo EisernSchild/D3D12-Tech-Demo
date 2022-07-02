@@ -53,7 +53,7 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 	float2 sUV = sIn.sPosL.xz;
 
 	// this normal method is a mess... do that mathematically correct
-	float3 afHeight = fbm_normal(sUV * afFbmScale.x);
+	float3 afHeight = fbm_normal(sUV * afFbmScale.x, 1.f);
 	sIn.sPosL.y = afHeight.y * afFbmScale.y;
 
 	// set normal

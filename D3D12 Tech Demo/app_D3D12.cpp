@@ -88,7 +88,7 @@ signed App_D3D12::InitDirect3D(AppData& sData)
 		m_sD3D.bDXRSupport = false;
 	}
 
-	// uncomment to force BlinPhong
+	// uncomment to force hex mesh
 	// m_sD3D.bDXRSupport = false;
 
 	// get descriptor sizes
