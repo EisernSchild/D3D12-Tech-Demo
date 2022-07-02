@@ -52,6 +52,34 @@ float frac_noise_simplex(in float2 uv)
 }
 
 // return gradient noise (in x)
+float _noised(in float2 afP)
+{
+	float2 vI = abs(floor(afP));
+	float2 vF = abs(frac(afP));
+
+	// we always use quintic interpolation ! (no terrain flaws !)
+#if 1
+	// quintic interpolation
+	float2 vU = vF * vF * vF * (vF * (vF * 6.0 - 15.0) + 10.0);
+#else
+	// cubic interpolation
+	float2 vU = vF * vF * (3.0 - 2.0 * vF);
+#endif 
+
+	float2 vGa = hash(vI + float2(0.0, 0.0));
+	float2 vGb = hash(vI + float2(1.0, 0.0));
+	float2 vGc = hash(vI + float2(0.0, 1.0));
+	float2 vGd = hash(vI + float2(1.0, 1.0));
+
+	float vVa = dot(vGa, vF - float2(0.0, 0.0));
+	float vVb = dot(vGb, vF - float2(1.0, 0.0));
+	float vVc = dot(vGc, vF - float2(0.0, 1.0));
+	float vVd = dot(vGd, vF - float2(1.0, 1.0));
+
+	return vVa + vU.x * (vVb - vVa) + vU.y * (vVc - vVa) + vU.x * vU.y * (vVa - vVb - vVc + vVd);
+}
+
+// return gradient noise (in x)
 float noised(in float2 afP)
 {
 	float2 vI = floor(afP);

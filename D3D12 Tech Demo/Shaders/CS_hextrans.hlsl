@@ -44,7 +44,28 @@ void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThre
 	uint uBufferTileI = uint(sDispatchTID.x) / uint(sHexData.x);
 	uint uTileI = uint(avTilePos[uBufferTileI].z);
 	uint uBaseI = uint(sDispatchTID.x) % uint(sHexData.x);
-	
+
+	// for some reason we get flaws here in compute shader
+	// in "noised" method...
+	// (moved to vertex shader)
+	//
+	// TODO !! use shader debugger to find out whats going on here !!
+
+	// scale fractal
+	// const float2 afFbmScale = float2(.05f, 10.f);
+
+	// this normal method is a mess... do that mathematically correct !!
+	// float3 afHeight = fbm_normal(abs(sUV) * afFbmScale.x);
+
+	// the first tile is our base tile, set new position based on this tile
+	float2 sUV = sVBOut[uBaseI].sPosL.xz + avTilePos[uBufferTileI].xy;
+
+	// set terrain.. UV is our XY position
+	sVBOut[uTileI * sHexData.x + sHexData.x + uBaseI].sPosL.y = 0.f;
+	sVBOut[uTileI * sHexData.x + sHexData.x + uBaseI].sPosL.xz = sUV;
+
+
+	/*
 	// scale fractal
 	const float2 afFbmScale = float2(.05f, 10.f);
 
@@ -53,11 +74,12 @@ void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThre
 
 	// this normal method is a mess... do that mathematically correct !!
 	float3 afHeight = fbm_normal(sUV * afFbmScale.x);
-	
+
 	// set terrain.. UV is our XY position
 	sVBOut[uTileI * sHexData.x + sHexData.x + uBaseI].sPosL.y = afHeight.y * afFbmScale.y;
 	sVBOut[uTileI * sHexData.x + sHexData.x + uBaseI].sPosL.xz = sUV;
 
 	// set normal as color
 	sVBOut[uTileI * sHexData.x + sHexData.x + uBaseI].sCol = float4(normalize(float3(afHeight.x * afFbmScale.y, .1f, afHeight.z * afFbmScale.y)), 1.f);
+	*/
 }

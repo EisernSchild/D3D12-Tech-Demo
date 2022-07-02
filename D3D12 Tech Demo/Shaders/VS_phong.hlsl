@@ -43,35 +43,28 @@ struct Out
 Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID)
 {
 	Out sOut;
-	
-	/* moved to compute shader... leave here for testing
-	// get hex tile position
-	float2 sInstOffset = avTilePos[uInstIx];
 
-	// get world position with zero height (y)
-	float3 sPosL = sIn.sPosL + float3(sInstOffset.x, 0., sInstOffset.y);
+	// compute terrain here... in compute shader we get flaws
+	// for some reason.... !!
+	//
 
 	// compute terrain.. we later move that to the compute shader
 	const float2 afFbmScale = float2(.05f, 10.f);
-	float2 sUV = sPosL.xz;
+	float2 sUV = sIn.sPosL.xz;
 
+	// this normal method is a mess... do that mathematically correct
 	float3 afHeight = fbm_normal(sUV * afFbmScale.x);
-	sPosL.y = afHeight.y * afFbmScale.y;
+	sIn.sPosL.y = afHeight.y * afFbmScale.y;
 
 	// set normal
 	sOut.sNormal = normalize(float3(afHeight.x * afFbmScale.y, .1f, afHeight.z * afFbmScale.y));
-	*/
-
-	// input color is our normal here... rename by time
-	float3 sPosL = sIn.sPosL;
-	sOut.sNormal = sIn.sCol.xyz;
 
 	// transform to homogeneous clip space, pass color
-	sOut.sPosH = mul(float4(sPosL, 1.0f), sWVP);
+	sOut.sPosH = mul(float4(sIn.sPosL, 1.0f), sWVP);
 	sOut.sCol = sIn.sCol;
 
 	// set world position
-	sOut.sPosW = sPosL;
-
+	sOut.sPosW = sIn.sPosL;
+	
 	return sOut;
 }
