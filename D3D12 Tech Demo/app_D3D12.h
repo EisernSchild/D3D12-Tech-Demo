@@ -101,6 +101,8 @@ protected:
 		bool b4xMsaaState = false;
 		/// <summary>true if DXR is supported by device</summary>
 		bool bDXRSupport = false;
+		/// <summary>true if DXR is chosen by user</summary>
+		bool bDXRMode = false;
 		/// <summary>4 x MSAA Quality</summary>
 		UINT u4xMsaaQuality = 0;
 		/// <summary>the screen viewport</summary>

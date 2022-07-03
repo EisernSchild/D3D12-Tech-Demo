@@ -88,9 +88,6 @@ signed App_D3D12::InitDirect3D(AppData& sData)
 		m_sD3D.bDXRSupport = false;
 	}
 
-	// uncomment to force hex mesh
-	// m_sD3D.bDXRSupport = false;
-
 	// get descriptor sizes
 	m_sD3D.uRtvDcSz = m_sD3D.psDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	m_sD3D.uDsvDcSz = m_sD3D.psDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
@@ -327,6 +324,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	float fTimeEl = sData.fTotal - s_fTimeOld;
 	static float s_fTmp = 0.f;
 	s_fTmp += fTimeEl;
+	static WORD uButtonOld = 0;
 
 	/// world - view - projection
 	{
@@ -350,6 +348,10 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 			m_sScene.fYaw = fmod(m_sScene.fYaw, XM_2PI);
 			m_sScene.fPitch = ((float)sState.Gamepad.sThumbRY / 32767.f) * XM_PIDIV2;
 		}
+
+		// switch mode ? use START button
+		if ((sState.Gamepad.wButtons & 0x0010) && !(uButtonOld & 0x0010)) m_sD3D.bDXRMode = !m_sD3D.bDXRMode;
+		uButtonOld = sState.Gamepad.wButtons;
 
 		// word view projection...
 		XMFLOAT4X4 sWorld, sView, sProj;
@@ -491,7 +493,7 @@ void App_D3D12::Clear()
 
 signed App_D3D12::Draw(const AppData& sData)
 {
-	if (m_sD3D.bDXRSupport)
+	if ((m_sD3D.bDXRSupport) && (m_sD3D.bDXRMode))
 	{
 		DrawDXR();
 		return APP_FORWARD;
