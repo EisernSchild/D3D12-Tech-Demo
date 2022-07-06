@@ -52,12 +52,14 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 	const float2 afFbmScale = float2(.05f, 10.f);
 	float2 sUV = sIn.sPosL.xz;
 
-	// this normal method is a mess... do that mathematically correct
-	float3 afHeight = fbm_normal(sUV * afFbmScale.x, 1.f);
-	sIn.sPosL.y = afHeight.y * afFbmScale.y;
+	// do the actual computation with fbm normal method
+	float fTerrain;
+	float3 vNormal;
+	fbm_normal(sUV * afFbmScale.x, 1.f, fTerrain, vNormal);
 
-	// set normal
-	sOut.sNormal = normalize(float3(afHeight.x * afFbmScale.y, .1f, afHeight.z * afFbmScale.y));
+	// set terrain height, normal
+	sIn.sPosL.y = fTerrain * afFbmScale.y;
+	sOut.sNormal = float4(vNormal, 1.f);
 
 	// transform to homogeneous clip space, pass color
 	sOut.sPosH = mul(float4(sIn.sPosL, 1.0f), sWVP);

@@ -27,6 +27,7 @@
     <None Include="..\..\..\LICENSE" />
     <None Include="..\..\..\README.md" />
     <None Include="..\..\Shaders\fbm.hlsli" />
+    <None Include="..\..\Shaders\vrc.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\CS_hextrans.hlsl">

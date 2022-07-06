@@ -53,6 +53,9 @@
     <None Include="..\..\Shaders\fbm.hlsli">
       <Filter>shader</Filter>
     </None>
+    <None Include="..\..\Shaders\vrc.hlsli">
+      <Filter>shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\PS_phong.hlsl">

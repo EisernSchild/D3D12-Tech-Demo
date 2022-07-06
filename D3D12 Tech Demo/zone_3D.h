@@ -66,8 +66,9 @@ struct VertexPosCol
 };
 
 /// <summary>hlsl attribute structure</summary>
-struct ProceduralPrimitiveAttributes
+struct PosNorm
 {
+	XMFLOAT3 vPosition;
 	XMFLOAT3 vNormal;
 };
 

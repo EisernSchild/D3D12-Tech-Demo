@@ -1149,7 +1149,7 @@ signed App_D3D12::CreateDXRStateObject()
 
 	// set shader config sub object (float4 color float2 barycentrics)
 	auto pcShaderConf = sObjectDc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-	UINT uAttributeSize = sizeof(struct ProceduralPrimitiveAttributes);
+	UINT uAttributeSize = sizeof(struct PosNorm);
 	pcShaderConf->Config(4 * sizeof(float), uAttributeSize);
 
 	// set global root signature sub object

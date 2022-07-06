@@ -192,13 +192,19 @@ float fbm(in float2 vX, in float fH)
 	return fT;
 }
 
-float3 fbm_normal(in float2 vX, in float fH)
+// heightmap normal calculation helper
+//
+void fbm_normal(in float2 vX, in float fH, out float fTerrain, out float3 vNormal, in float fSquareHalf = .05f)
 {
-	float3 vV =
-		float3(
-			fbm(vX - float2(-.1, .0), fH) - fbm(vX - float2(.1, .0), fH),
-			fbm(vX, fH),
-			fbm(vX - float2(.0, -.1), fH) - fbm(vX - float2(.0, .1), fH)
-			);
-	return vV;
+	// get terrain square
+	float fL = fbm(vX - float2(-fSquareHalf, .0), fH);
+	float fR = fbm(vX - float2(fSquareHalf, .0), fH);
+	float fU = fbm(vX - float2(.0, -fSquareHalf), fH);
+	float fD = fbm(vX - float2(.0, fSquareHalf), fH);
+	fTerrain = (fL + fR + fU + fD) * .25f;
+
+	// calculate normal
+	float3 vTangent = float3(2.0, fR - fL, 0.0);
+	float3 vBitangent = float3(0.0, fD - fU, 2.0);
+	vNormal = normalize(cross(vTangent, vBitangent));
 }

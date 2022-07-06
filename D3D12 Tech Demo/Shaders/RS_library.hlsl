@@ -3,7 +3,7 @@
 // 
 // SPDX-License-Identifier: MIT
 
-#include"fbm.hlsli"
+#include"vrc.hlsli"
 
 /// basic scene constant buffer
 cbuffer sScene : register(b0)
@@ -28,11 +28,6 @@ cbuffer sScene : register(b0)
 
 RaytracingAccelerationStructure Scene : register(t0);
 RWTexture2D<float4> RenderTarget                : register(u0);
-
-struct ProceduralPrimitiveAttributes
-{
-	float3 vNormal;
-};
 
 struct RayPayload
 {
@@ -70,7 +65,7 @@ void RayGenerationShader()
 		vDirect,
 		10000.0
 	};
-		
+
 	RayPayload sPay = { float4(0, 0, 0, 0) };
 	TraceRay(Scene,
 		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
@@ -81,7 +76,7 @@ void RayGenerationShader()
 	float fVgn1 = pow(smoothstep(0.0, .3, (sUV.x + 1.) * (sUV.y + 1.) * (sUV.x - 1.) * (sUV.y - 1.)), .5);
 	float fVgn2 = 1. - pow(dot(float2(sUV.x * .3, sUV.y), sUV), 3.);
 	sPay.vColor *= lerp(fVgn1, fVgn2, .4) * .5 + 0.5;
-	
+
 	// set color
 	RenderTarget[DispatchRaysIndex().xy] = sPay.vColor;
 }
@@ -89,10 +84,10 @@ void RayGenerationShader()
 // phong constants
 static const float4 sDiffuseAlbedo = { .9f, .9f, 1.f, 1.0f };
 static const float3 sFresnelR0 = { 0.01f, 0.01f, 0.01f };
-static const float4 sAmbientLight = { 0.3f, 0.4f, 0.5f, 1.0f };
+static const float4 sAmbientLight = { 0.1f, 0.2f, 0.2f, 1.0f };
 static const float fRoughness = 0.15f;
 static const float3 sStrength = { .9f, .9f, .9f };
-static const float3 sLightVec = { 1.f, -.6f, .5f };
+static const float3 sLightVec = { .2f, -.6f, .5f };
 
 float CalcAttenuation(float d, float falloffStart, float falloffEnd)
 {
@@ -131,38 +126,31 @@ float3 BlinnPhong(float3 sDiffuse, float3 lightStrength, float3 lightVec, float3
 }
 
 [shader("closesthit")]
-void ClosestHitShader(inout RayPayload sPay, in ProceduralPrimitiveAttributes attr)
+void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
 {
 	float fFbmScale = .05f, fFbmScaleSimplex = .5f;
 	const float2 afFbmScale = float2(.05f, 10.f);
-	float2 sUV = attr.vNormal.xz;
+	float2 sUV = sAttr.vPosition.xz;
 
-	// this normal method is a mess... do that mathematically correct
-	float3 afHeight = fbm_normal(sUV * fFbmScale, .5f);
+	// back scale
+	float fTerrain = sAttr.vPosition.y * .1f;
 
 	// get base height color
-	float fHeight = max((afHeight.y + 1.) * .5f, 0.f);
-	float3 sDiffuse = lerp(float3(1., 1., 1.) - sDiffuseAlbedo.xyz, sDiffuseAlbedo.xyz, fHeight);
-
-	// draw rocks
-	float fRocks = frac_noise_simplex(sUV * fFbmScaleSimplex * .2);
-	sDiffuse = lerp(float3(.1, .1, .1), sDiffuse, max(fHeight, fRocks));
+	float fHeight = max((fTerrain + 1.) * .5f, 0.f);
+	float3 sDiffuse = lerp(float3(.65, .6, .4), sDiffuseAlbedo.xyz, smoothstep(0.5f, 0.7f, fHeight));
 
 	// draw grassland
-	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex);
+	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex * 2.f);
 	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), max(1.0f - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
-		
-	// set normal
-	float3 sNormal = normalize(float3(afHeight.x * afFbmScale.y, .5f, afHeight.z * afFbmScale.y));
-	
+
 	// to camera vector, ambient light
-	float3 sToEyeW = normalize(sCamPos.xyz - attr.vNormal);
+	float3 sToEyeW = normalize(sCamPos.xyz - sAttr.vPosition);
 	float4 sAmbient = sAmbientLight * float4(sDiffuse, 1.f);
-	float fNdotL = max(dot(sLightVec, sNormal), 0.1f);
+	float fNdotL = max(dot(sLightVec, sAttr.vNormal), 0.1f);
 	float3 sStr = sStrength * fNdotL;
 
 	// do phong
-	sPay.vColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sNormal, sToEyeW, smoothstep(.5, .55, abs(fHeight))), 1.f);
+	sPay.vColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sAttr.vNormal, sToEyeW, smoothstep(.5, .55, abs(fHeight))), 1.f);
 }
 
 [shader("miss")]
@@ -174,46 +162,16 @@ void MissShader(inout RayPayload sPay)
 [shader("intersection")]
 void IntersectionShader()
 {
-	const float2 afFbmScale = float2(.05f, 10.f);
 	float fThit = 0.1f;
-	ProceduralPrimitiveAttributes attr = (ProceduralPrimitiveAttributes)0;
+	PosNorm sAttr = (PosNorm)0;
 
-	// get origin
-	float3 vOri = ObjectRayOrigin();
-	float3 vOriA = abs(vOri);
-	float3 vOriL = vOri;
-
-	// direction normalized
-	float3 vDir = normalize(ObjectRayDirection());
-
-	// raymarch 
-	const int nMaxRaySteps = 40;
-	float fStepAdjust = .6f;
-	float3 vStep = vDir;
-	float fThitPrev = fThit;
-	for (int n = 0; n < nMaxRaySteps; n++)
+	// do volume ray cast - fractal brownian motion
+	if (vrc_fbm(
+		ObjectRayOrigin(),
+		normalize(ObjectRayDirection()),
+		fThit,
+		sAttr))
 	{
-		// get terrain height, this should be precomputed in heighmap
-		float fTerrainY =
-			fbm(vOriL.xz * afFbmScale.x, 1.f) * afFbmScale.y;
-		
-		fThitPrev = fThit;
-		fThit = vOriL.y - fTerrainY;
-		if (fThit < 0.1f)
-		{
-			if (fThit < 0.f)
-			{
-				fThit = abs(fThit);
-				vOriL -= vStep * (fThit / (fThit + fThitPrev));
-				fThit = 0.01f;
-			}
-			attr.vNormal = float3(vOriL.x, fTerrainY, vOriL.z);
-			ReportHit(fThit, 0, attr);
-			return;
-		}
-
-		// raymarch step
-		vStep = vDir * abs(fThit) * fStepAdjust;
-		vOriL += vStep;
+		ReportHit(fThit, 0, sAttr);
 	}
 }

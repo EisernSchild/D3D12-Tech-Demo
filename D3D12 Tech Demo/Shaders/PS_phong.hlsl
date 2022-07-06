@@ -35,10 +35,10 @@ struct In
 // phong constants
 static const float4 sDiffuseAlbedo = { .9f, .9f, 1.f, 1.0f };
 static const float3 sFresnelR0 = { 0.01f, 0.01f, 0.01f };
-static const float4 sAmbientLight = { 0.3f, 0.4f, 0.5f, 1.0f };
+static const float4 sAmbientLight = { 0.1f, 0.2f, 0.2f, 1.0f };
 static const float fRoughness = 0.15f;
 static const float3 sStrength = { .9f, .9f, .9f };
-static const float3 sLightVec = { 1.f, -.6f, .5f };
+static const float3 sLightVec = { .2f, -.6f, .5f};
 
 float graduate(float fV, float fR)
 {
@@ -96,17 +96,16 @@ float4 main(in In sIn) : SV_Target
 	// compute terrain texture.. we later move that to the compute shader
 	float2 sUV = sIn.sPosW.xz;
 	float fFbmScale = .05f, fFbmScaleSimplex = .5f;
-	float fHeight = max((fbm(sUV* fFbmScale, .5) + 1.) * .5f, 0.f);
 	
-	// get base height color
-	float3 sDiffuse = lerp(float3(1., 1., 1.) - sDiffuseAlbedo.xyz, sDiffuseAlbedo.xyz, fHeight);
+	// back scale
+	float fTerrain = sIn.sPosW.y * .1f;
 
-	// draw rocks
-	float fRocks = frac_noise_simplex(sUV* fFbmScaleSimplex * .2);
-	sDiffuse = lerp(float3(.1, .1, .1), sDiffuse, max(fHeight, fRocks));
+	// get base height color
+	float fHeight = max((fTerrain + 1.) * .5f, 0.f);
+	float3 sDiffuse = lerp(float3(.65, .6, .4), sDiffuseAlbedo.xyz, smoothstep(0.5f, 0.7f, fHeight));
 
 	// draw grassland
-	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex);
+	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex * 2.f);
 	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), max(1.0f  - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
 
 	// renormalize normal
@@ -115,11 +114,11 @@ float4 main(in In sIn) : SV_Target
 	// to camera vector, ambient light
 	float3 sToEyeW = normalize(sCamPos.xyz - sIn.sPosW);
 	float4 sAmbient = sAmbientLight * float4(sDiffuse, 1.f);
-	float fNdotL = max(dot(sLightVec, sIn.sNormal), 0.1f);
+	float fNdotL = dot(sLightVec, sIn.sNormal);
 	float3 sStr = sStrength * fNdotL;
 
 	// do phong
-	float4 sLitColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sIn.sNormal, sToEyeW, smoothstep(.5, .55, abs(fHeight))), 1.f);
+	float4 sLitColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sIn.sNormal, sToEyeW, smoothstep(0.f, .7f, fHeight)), 1.f);
 		
 	return sLitColor;
 
