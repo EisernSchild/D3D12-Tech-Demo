@@ -11,6 +11,25 @@ struct PosNorm
 	float3 vNormal;
 };
 
+// transform a ray based on screen position, camera position and inverse wvp matrix 
+inline void transform_ray(in uint2 sIndex, in float2 sScreenSz, in float4 vCamPos, in float4x4 sWVPrInv, 
+	out float3 vOrigin, out float3 vDirection)
+{
+	// center in the middle of the pixel, get screen position
+	float2 vXy = sIndex.xy + 0.5f;
+	float2 vUv = vXy / sScreenSz.xy * 2.0 - 1.0;
+
+	// invert y 
+	vUv.y = -vUv.y;
+
+	// unproject by inverse wvp
+	float4 vWorld = mul(float4(vUv, 0, 1), sWVPrInv);
+
+	vWorld.xyz /= vWorld.w;
+	vOrigin = vCamPos.xyz;
+	vDirection = normalize(vWorld.xyz - vOrigin);
+}
+
 // Volume Ray Casting - Fractal Brownian Motion
 bool vrc_fbm(
 	in float3 vOri,

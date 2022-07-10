@@ -34,31 +34,14 @@ struct RayPayload
 	float4 vColor;
 };
 
-inline void TransformRay(uint2 index, out float3 origin, out float3 direction)
-{
-	float2 xy = index + 0.5f; // center in the middle of the pixel.
-	float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0 - 1.0;
-
-	// Invert Y for DirectX-style coordinates.
-	screenPos.y = -screenPos.y;
-
-	// unproject by inverse wvp
-	float4 world = mul(float4(screenPos, 0, 1), sWVPrInv);
-
-	world.xyz /= world.w;
-	origin = sCamPos.xyz;
-	direction = normalize(world.xyz - origin);
-}
-
 [shader("raygeneration")]
 void RayGenerationShader()
 {
 	float3 vDirect;
 	float3 vOrigin;
 
-	// generate a ray by dispatched grid
-	TransformRay(DispatchRaysIndex().xy, vOrigin, vDirect);
-
+	// generate a ray by index
+	transform_ray(DispatchRaysIndex().xy, DispatchRaysDimensions().xy, sCamPos, sWVPrInv, vOrigin, vDirect);
 	RayDesc sRay = {
 		vOrigin,
 		0.001,

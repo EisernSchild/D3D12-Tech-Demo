@@ -3,6 +3,8 @@
 // 
 // SPDX-License-Identifier: MIT
 
+#include"vrc.hlsli"
+
 /// basic scene constant buffer
 cbuffer sScene : register(b0)
 {
@@ -20,6 +22,8 @@ cbuffer sScene : register(b0)
 	float4 sCamPos;
 	/// camera velocity 3d vector (xyz - direction)
 	float4 sCamVelo;
+	/// inverse world-view-projection
+	float4x4 sWVPrInv;
 };
 
 Texture2D sTexIn            : register(t0);
@@ -77,6 +81,14 @@ float3 blur_radial(Texture2D sTex, float2 sUv, int nSc, float fStrength, float f
 	return lerp(sTex[sUv].xyz, sAvarage, clamp(fDist * fStrength, 0.0, 1.0));
 }
 
+float vignette(float2 sUv, float2 sScreen)
+{
+	float2 sUvn = ((float2(float(sUv.x), float(sUv.y)) / sScreen.xy) - .5) * 2.;
+	float fVgn1 = pow(smoothstep(0.0, .3, (sUvn.x + 1.) * (sUvn.y + 1.) * (sUvn.x - 1.) * (sUvn.y - 1.)), .5);
+	float fVgn2 = 1. - pow(dot(float2(sUvn.x * .3, sUvn.y), sUvn), 3.);
+	return lerp(fVgn1, fVgn2, .4) * .5 + 0.5;
+}
+
 [numthreads(N, 1, 1)]
 void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThreadID)
 {
@@ -86,16 +98,23 @@ void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThre
 	// float4 sPostCol = float4(bevel(sTexIn, sDispatchTID.xy, float2(cos(1.3), sin(2.0)), 4.), 1.);
 
 	// smoothing
-	float4 sPostCol = float4(smooth(sTexIn, sDispatchTID.xy, float2(2., 2.), 2.), 1.);
+	// float4 sPostCol = float4(smooth(sTexIn, sDispatchTID.xy, float2(2., 2.), 2.), 1.);
 
 	// radial blur
 	// float4 sPostCol = float4(blur_radial(sTexIn, sDispatchTID.xy, 10., 2., .00075, (sViewport.zw * .5) - sDispatchTID.xy), 1.);
 
 	// vignette
-	float2 sUV = ((float2(float(sDispatchTID.x), float(sDispatchTID.y)) / sViewport.zw) - .5) * 2.;
-	float fVgn1 = pow(smoothstep(0.0, .3, (sUV.x + 1.) * (sUV.y + 1.) * (sUV.x - 1.) * (sUV.y - 1.)), .5);
-	float fVgn2 = 1. - pow(dot(float2(sUV.x * .3, sUV.y), sUV), 3.);
-	sPostCol *= lerp(fVgn1, fVgn2, .4) * .5 + 0.5;
+	// sPostCol *= vignette(sDispatchTID.xy, sViewport.zw);
+
+	float4 sPostCol = sTexIn[sDispatchTID.xy];
+	float3 vDirect;
+	float3 vOrigin;
+
+	transform_ray(sDispatchTID.xy, sViewport.zw, sCamPos, sWVPrInv, vOrigin, vDirect);
+
+	// sPostCol.xyz *= 1. - abs(vDirect.y);
+
+	sPostCol *= vignette(sDispatchTID.xy, sViewport.zw);
 
 	sTexOut[sDispatchTID.xy] = sPostCol;
 }
