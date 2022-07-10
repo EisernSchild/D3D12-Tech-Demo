@@ -49,7 +49,8 @@ float3 graduate(float3 fV, float fR)
 
 float4 main(in In sIn) : SV_Target
 {
-	clip(sIn.sPosH.z > 1.f ? -1 : 1);
+	// clip rim
+	clip(sIn.sPosH.z > .99f ? -1 : 1);
 
 	// compute terrain texture.. we later move that to the compute shader
 	float2 sUV = sIn.sPosW.xz;
@@ -64,7 +65,7 @@ float4 main(in In sIn) : SV_Target
 
 	// draw grassland
 	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex * 2.f);
-	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), max(1.0f  - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
+	sDiffuse = lerp(lerp(float3(.5f, .3, .9), float3(.3f, .8, .4), max(1.0f  - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
 
 	// renormalize normal
 	sIn.sNormal = normalize(sIn.sNormal);
@@ -77,10 +78,8 @@ float4 main(in In sIn) : SV_Target
 
 	// do phong
 	float4 sLitColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sIn.sNormal, sToEyeW, smoothstep(0.f, .7f, fHeight)), 1.f);
-		
-	float fFog = smoothstep(.48f, .5f, sIn.sPosH.z * .5f) * .65f;
-	float4 fFogColor = float4(.8f, .9f, 1.f, 1.f) * min(fFog, 1.f);
-	return max(sLitColor, fFogColor);
+	
+	return sLitColor;
 
 	// draw b/w grid based on uv position
 	/*return max(lerp(float4(0.2, 0.3, 0.4, 1.), float4(0.1, 1., 0.2, 1.), fY) + pow(sIn.sPosH.z, 2) * .001,
