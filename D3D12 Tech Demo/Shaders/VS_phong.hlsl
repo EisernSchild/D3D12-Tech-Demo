@@ -59,7 +59,7 @@ Out main(in In sIn, in uint uVxIx : SV_VertexID, in uint uInstIx : SV_InstanceID
 
 	// set terrain height, normal
 	sIn.sPosL.y = fTerrain * afFbmScale.y;
-	sOut.sNormal = float4(vNormal, 1.f);
+	sOut.sNormal = vNormal;
 
 	// transform to homogeneous clip space, pass color
 	sOut.sPosH = mul(float4(sIn.sPosL, 1.0f), sWVP);

@@ -106,14 +106,80 @@ void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThre
 	// vignette
 	// sPostCol *= vignette(sDispatchTID.xy, sViewport.zw);
 
+	// get a ray by screen position
 	float4 sPostCol = sTexIn[sDispatchTID.xy];
 	float3 vDirect;
 	float3 vOrigin;
-
 	transform_ray(sDispatchTID.xy, sViewport.zw, sCamPos, sWVPrInv, vOrigin, vDirect);
 
-	// sPostCol.xyz *= 1. - abs(vDirect.y);
+	// no texel set ? (= negative alpha)... draw background panorama
+	if (sPostCol.a == 0.f)
+	{
+		// vDirect already normalized by transform method
+		float fGradient = abs(vDirect.y - .05f);
 
+		// ray goes up ?
+		if (vDirect.y > 0.05f)
+		{
+			sPostCol = lerp(float4(.4f, .4f, 1.f, 1.f), float4(.2f, .2f, 1.f, 1.f), smoothstep(.0f, .3f, fGradient));
+		}
+		else
+		{
+			// ray goes down.. do volume ray cast - fractal brownian motion
+			float fThit = 0.1f;
+			PosNorm sAttr = (PosNorm)0;
+			float3 sToEyeW = float3(1.f, 1.f, 0.f);
+
+			// add hex grid rim distance to ray... adjust according to mountain 
+			// width to avoid vOrigin within terrain
+			const float fMountMaxWidth = 15.f;
+			const float fRimDist = 110.8512516844081f - fMountMaxWidth;
+
+			// if camera y position is heigher than rim set this as rim
+			vOrigin += vDirect * max(fRimDist, vOrigin.y);
+
+			if (vrc_fbm(
+				vOrigin,
+				normalize(vDirect),
+				fThit,
+				sAttr,
+				50))
+			{
+				float fFbmScale = .05f, fFbmScaleSimplex = .5f;
+				const float2 afFbmScale = float2(.05f, 10.f);
+				float2 sUV = sAttr.vPosition.xz;
+
+				// back scale
+				float fTerrain = sAttr.vPosition.y * .1f;
+
+				// get base height color
+				float fHeight = max((fTerrain + 1.) * .5f, 0.f);
+				float3 sDiffuse = lerp(float3(.65, .6, .4), sDiffuseAlbedo.xyz, smoothstep(0.5f, 0.7f, fHeight));
+
+				// draw grassland
+				float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex * 2.f);
+				sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), max(1.0f - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
+
+				// to camera vector, ambient light
+				sToEyeW = sCamPos.xyz - sAttr.vPosition;
+				float3 sToEyeWN = normalize(sToEyeW);
+				float4 sAmbient = sAmbientLight * float4(sDiffuse, 1.f);
+				float fNdotL = max(dot(sLightVec, sAttr.vNormal), 0.1f);
+				float3 sStr = sStrength * fNdotL;
+
+				// do phong
+				sPostCol = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sAttr.vNormal, sToEyeWN, smoothstep(.5, .55, abs(fHeight))), 1.f);
+			}
+			else // terrain simple gradient
+				sPostCol = lerp(float4(.4f, .4f, 1.f, 1.f), float4(.8f, .9f, 1.f, 1.f), smoothstep(.0, .05f, fGradient));
+
+			float fDepth = length(sToEyeW);
+			float fFog = fDepth * .0052f;
+			float4 fFogColor = float4(.8f, .9f, 1.f, 1.f) * min(fFog, 1.f);
+			sPostCol = max(sPostCol, fFogColor);
+		}
+	}
+	
 	sPostCol *= vignette(sDispatchTID.xy, sViewport.zw);
 
 	sTexOut[sDispatchTID.xy] = sPostCol;

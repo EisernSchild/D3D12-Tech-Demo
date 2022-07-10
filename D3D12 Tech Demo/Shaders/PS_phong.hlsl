@@ -32,14 +32,6 @@ struct In
 	float3 sNormal : NORMAL;
 };
 
-// phong constants
-static const float4 sDiffuseAlbedo = { .9f, .9f, 1.f, 1.0f };
-static const float3 sFresnelR0 = { 0.01f, 0.01f, 0.01f };
-static const float4 sAmbientLight = { 0.1f, 0.2f, 0.2f, 1.0f };
-static const float fRoughness = 0.15f;
-static const float3 sStrength = { .9f, .9f, .9f };
-static const float3 sLightVec = { .2f, -.6f, .5f};
-
 float graduate(float fV, float fR)
 {
 	return clamp((0.5 * fR - abs(0.5 - fmod(fV + 0.5, 1.0))) * 2.0 / fR, 0.0, 1.0);
@@ -55,44 +47,10 @@ float3 graduate(float3 fV, float fR)
 	return clamp((0.5 * fR - abs(0.5 - fmod(fV + 0.5, 1.0))) * 2.0 / fR, 0.0, 1.0);
 }
 
-float CalcAttenuation(float d, float falloffStart, float falloffEnd)
-{
-	// Linear falloff.
-	return saturate((falloffEnd - d) / (falloffEnd - falloffStart));
-}
-
-// Schlick gives an approximation to Fresnel reflectance (see pg. 233 "Real-Time Rendering 3rd Ed.").
-// R0 = ( (n-1)/(n+1) )^2, where n is the index of refraction.
-float3 SchlickFresnel(float3 R0, float3 normal, float3 lightVec)
-{
-	float cosIncidentAngle = saturate(dot(normal, lightVec));
-
-	float f0 = 1.0f - cosIncidentAngle;
-	float3 reflectPercent = R0 + (1.0f - R0) * (f0 * f0 * f0 * f0 * f0);
-
-	return reflectPercent;
-}
-
-// BlinnPhong method by Frank Luna (C) 2015 All Rights Reserved.
-float3 BlinnPhong(float3 sDiffuse, float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, float fSpec)
-{
-	const float m = (1.f - fRoughness) * 256.0f;
-	float3 halfVec = normalize(toEye + lightVec);
-
-	float roughnessFactor = (m + 8.0f) * pow(max(dot(halfVec, normal), 0.0f), m) / 8.0f;
-	float3 fresnelFactor = SchlickFresnel(sFresnelR0, halfVec, lightVec);
-
-	float3 specAlbedo = fresnelFactor * roughnessFactor;
-
-	// Our spec formula goes outside [0,1] range, but we are 
-	// doing LDR rendering.  So scale it down a bit.
-	specAlbedo = (specAlbedo / (specAlbedo + 1.0f)) * fSpec;
-
-	return (sDiffuse + specAlbedo) * lightStrength;
-}
-
 float4 main(in In sIn) : SV_Target
 {
+	clip(sIn.sPosH.z > 1.f ? -1 : 1);
+
 	// compute terrain texture.. we later move that to the compute shader
 	float2 sUV = sIn.sPosW.xz;
 	float fFbmScale = .05f, fFbmScaleSimplex = .5f;
@@ -120,7 +78,9 @@ float4 main(in In sIn) : SV_Target
 	// do phong
 	float4 sLitColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sIn.sNormal, sToEyeW, smoothstep(0.f, .7f, fHeight)), 1.f);
 		
-	return sLitColor;
+	float fFog = smoothstep(.48f, .5f, sIn.sPosH.z * .5f) * .65f;
+	float4 fFogColor = float4(.8f, .9f, 1.f, 1.f) * min(fFog, 1.f);
+	return max(sLitColor, fFogColor);
 
 	// draw b/w grid based on uv position
 	/*return max(lerp(float4(0.2, 0.3, 0.4, 1.), float4(0.1, 1., 0.2, 1.), fY) + pow(sIn.sPosH.z, 2) * .001,

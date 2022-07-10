@@ -48,7 +48,7 @@ protected:
 	/// <summary>Update constants</summary>
 	static signed UpdateConstants(const AppData& sData);
 	/// <summary>clear render target</summary>
-	static void Clear();
+	static void SetAndClearTarget();
 	/// <summary>First draw test function</summary>
 	static signed Draw(const AppData& sData);
 	/// <summary>Compute shader post processing</summary>
@@ -196,11 +196,13 @@ protected:
 		/// <summary>camera pitch, yaw</summary>
 		float fYaw = 0.f, fPitch = 0.f;
 		/// <summary>number of hex ambits (or "circles") around the main hexagon</summary>
-		const unsigned uAmbitN = 48;
+		const unsigned uAmbitN = 72;
 		/// <summary>number of hex tiles (or instances), to be computed</summary>
 		unsigned uInstN = 1;
 		/// <summary>number of vertices of one hex tile, to be computed</summary>
-		unsigned uBaseVtxN = 0;
+		unsigned uBaseVtcN = 0;
+		/// <summary>number of indices of one hex tile, to be computed</summary>
+		unsigned uBaseIdcN = 0;
 		/// <summary>hex tiles positions (current)</summary>
 		std::vector<XMFLOAT4> aafTilePos;
 		/// <summary>hex tiles positions (to be updated)</summary>

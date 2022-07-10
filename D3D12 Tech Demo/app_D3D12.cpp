@@ -332,7 +332,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		XINPUT_STATE sState = {};
 		uint32_t uR = XInputGetState(0, &sState);
 		if (uR == ERROR_SUCCESS)
-		{
+		{			
 			// position xz
 			float fThX = ((float)sState.Gamepad.sThumbLX / 32767.f) * fTimeEl * m_sScene.fAccelTran;
 			float fThY = ((float)sState.Gamepad.sThumbLY / 32767.f) * fTimeEl * m_sScene.fAccelTran;
@@ -457,7 +457,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		// set hex center as old for next frame
 		m_sScene.sHexXYc = sXY;
 
-		XMVECTOR sHexData = XMVectorSet((float)m_sScene.uBaseVtxN, 0, 0, 0);
+		XMVECTOR sHexData = XMVectorSet((float)m_sScene.uBaseVtcN, 0, 0, 0);
 		XMStoreUInt4(&m_sScene.sConstants.sHexData, sHexData);
 	}
 
@@ -474,7 +474,7 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 	return APP_FORWARD;
 }
 
-void App_D3D12::Clear()
+void App_D3D12::SetAndClearTarget()
 {
 	auto psCmdList = m_sD3D.psCmdList.Get();
 
@@ -511,20 +511,20 @@ signed App_D3D12::Draw(const AppData& sData)
 	m_sD3D.psCmdList->RSSetViewports(1, &m_sD3D.sScreenVp);
 	m_sD3D.psCmdList->RSSetScissorRects(1, &m_sD3D.sScissorRc);
 
-	// clear
-	const float afColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+	// clear, use zero alpha
+	const float afColor[] = { 0.f, 0.f, 0.f, 0.f };
 	m_sD3D.psCmdList->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(
 		m_sD3D.psHeapRTV->GetCPUDescriptorHandleForHeapStart(),
 		m_sD3D.nBackbufferI,
 		m_sD3D.uRtvDcSz), afColor, 0, nullptr);
-	Clear();
+	SetAndClearTarget();
 
 	// descriptor heaps, root signature
 	ID3D12DescriptorHeap* apsDHeaps[] = { m_sD3D.psHeapSRV.Get() };
 	m_sD3D.psCmdList->SetDescriptorHeaps(_countof(apsDHeaps), apsDHeaps);
 	m_sD3D.psCmdList->SetGraphicsRootSignature(m_sD3D.psRootSign.Get());
 
-	// vertex, index buffer - topology,... and draw
+	// vertex, index buffer - topology,... and draw skipping base hex tile
 	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcHexMesh->ViewV();
 	D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcHexMesh->ViewI();
 	m_sD3D.psCmdList->IASetVertexBuffers(0, 1, &sVBV);
@@ -532,8 +532,7 @@ signed App_D3D12::Draw(const AppData& sData)
 	m_sD3D.psCmdList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(0, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::SceneConstants]);
 	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(1, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
-	//m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), m_sD3D.pcHexMesh->Instances_N(), 0, 0, 0);
-	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), 1, 0, 0, 0);
+	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), 1, m_sScene.uBaseIdcN, 0, 0);
 
 	// update the hex tiles, first the offsets, then the tiles ( move that later... )
 	UpdateHexOffsets(D3D12_RESOURCE_STATE_GENERIC_READ);
@@ -610,7 +609,7 @@ void App_D3D12::OffsetTiles(ID3D12GraphicsCommandList* psCmdList,
 	psCmdList->SetComputeRootDescriptorTable(2, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::MeshVtcUav]);
 
 	// dispatch
-	UINT uNumGroupsX = (UINT)m_sScene.aafTilePosUpdate.size() * m_sScene.uBaseVtxN;
+	UINT uNumGroupsX = (UINT)m_sScene.aafTilePosUpdate.size() * m_sScene.uBaseVtcN;
 	psCmdList->Dispatch(uNumGroupsX, 1, 1);
 
 	// once dispatched we clear the update vector
@@ -1002,22 +1001,19 @@ signed App_D3D12::BuildGeometry()
 
 
 		// add the hexagons to the vertices/indices, first hex stays as base
-		m_sScene.uBaseVtxN = (unsigned)asHexagonVtc.size();
-		const unsigned uBaseIdxN = (unsigned)auHexIdc.size();
+		m_sScene.uBaseVtcN = (unsigned)asHexagonVtc.size();
+		m_sScene.uBaseIdcN = (unsigned)auHexIdc.size();
 		for (unsigned uI(0); uI < m_sScene.uInstN; uI++)
 		{
 			// we simply add the vertices with zero xy offset, this will be set by compute shader eventually
-			for (unsigned uJ(0); uJ < m_sScene.uBaseVtxN; uJ++)
+			for (unsigned uJ(0); uJ < m_sScene.uBaseVtcN; uJ++)
 				asHexagonVtc.push_back(asHexagonVtc[uJ]);
 
 			// we add the base number of vertices to the new index
-			for (unsigned uJ(0); uJ < uBaseIdxN; uJ++)
-				auHexIdc.push_back(auHexIdc[uJ] + (uI + 1) * m_sScene.uBaseVtxN);
+			for (unsigned uJ(0); uJ < m_sScene.uBaseIdcN; uJ++)
+				auHexIdc.push_back(auHexIdc[uJ] + (uI + 1) * m_sScene.uBaseVtcN);
 		}
-
-		// store vertex number to constants
-		// m_sScene.sConstants.sHexData.x = (UINT32)m_sScene.uBaseVtxN;
-
+		
 		// get uav handles, create mesh
 		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::MeshVtcUav] =
 			CD3DX12_CPU_DESCRIPTOR_HANDLE(m_sD3D.psHeapSRV->GetCPUDescriptorHandleForHeapStart(), (uint)CbvSrvUav_Heap_Idc::MeshVtcUav, m_sD3D.uCbvSrvUavDcSz);
@@ -1358,7 +1354,7 @@ void App_D3D12::DrawDXR()
 	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-	Clear();
+	SetAndClearTarget();
 	DoRaytracing();
 	RenderMap2Backbuffer();
 

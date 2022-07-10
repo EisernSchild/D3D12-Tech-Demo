@@ -36,9 +36,9 @@ bool vrc_fbm(
 	in float3 vDir,
 	out float fThit,
 	out PosNorm sAttr,
+	in const int nMaxRaySteps = 40,
 	in const float2 afFbmScale = float2(.05f, 10.f),
 	in const float fH = 1.f,
-	in const int nMaxRaySteps = 40,
 	in const float fStepAdjust = .6f)
 {
 	// raymarch 

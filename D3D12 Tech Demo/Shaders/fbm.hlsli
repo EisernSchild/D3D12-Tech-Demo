@@ -10,6 +10,9 @@
 // 
 // SPDX-License-Identifier: MIT
 
+// BlinnPhong method by Frank Luna © 2015 All Rights Reserved.
+
+
 #define PI 3.141592654f
 #define OCTAVES 6
 
@@ -194,7 +197,7 @@ float fbm(in float2 vX, in float fH)
 
 // heightmap normal calculation helper
 //
-void fbm_normal(in float2 vX, in float fH, out float fTerrain, out float3 vNormal, in float fSquareHalf = .05f)
+void fbm_normal(in float2 vX, in float fH, out float fTerrain, out float3 vNormal, in float fSquareHalf = .02f)
 {
 	// get terrain square
 	float fL = fbm(vX - float2(-fSquareHalf, .0), fH);
@@ -207,4 +210,48 @@ void fbm_normal(in float2 vX, in float fH, out float fTerrain, out float3 vNorma
 	float3 vTangent = float3(2.0, fR - fL, 0.0);
 	float3 vBitangent = float3(0.0, fD - fU, 2.0);
 	vNormal = normalize(cross(vTangent, vBitangent));
+}
+
+// phong constants
+static const float4 sDiffuseAlbedo = { .9f, .9f, 1.f, 1.0f };
+static const float3 sFresnelR0 = { 0.01f, 0.01f, 0.01f };
+static const float4 sAmbientLight = { 0.1f, 0.2f, 0.2f, 1.0f };
+static const float fRoughness = 0.15f;
+static const float3 sStrength = { .9f, .9f, .9f };
+static const float3 sLightVec = { .2f, -.6f, .5f };
+
+float CalcAttenuation(float d, float falloffStart, float falloffEnd)
+{
+	// Linear falloff.
+	return saturate((falloffEnd - d) / (falloffEnd - falloffStart));
+}
+
+// Schlick gives an approximation to Fresnel reflectance (see pg. 233 "Real-Time Rendering 3rd Ed.").
+// R0 = ( (n-1)/(n+1) )^2, where n is the index of refraction.
+float3 SchlickFresnel(float3 R0, float3 normal, float3 lightVec)
+{
+	float cosIncidentAngle = saturate(dot(normal, lightVec));
+
+	float f0 = 1.0f - cosIncidentAngle;
+	float3 reflectPercent = R0 + (1.0f - R0) * (f0 * f0 * f0 * f0 * f0);
+
+	return reflectPercent;
+}
+
+// BlinnPhong lighting model
+float3 BlinnPhong(float3 sDiffuse, float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, float fSpec)
+{
+	const float m = (1.f - fRoughness) * 256.0f;
+	float3 halfVec = normalize(toEye + lightVec);
+
+	float roughnessFactor = (m + 8.0f) * pow(max(dot(halfVec, normal), 0.0f), m) / 8.0f;
+	float3 fresnelFactor = SchlickFresnel(sFresnelR0, halfVec, lightVec);
+
+	float3 specAlbedo = fresnelFactor * roughnessFactor;
+
+	// Our spec formula goes outside [0,1] range, but we are 
+	// doing LDR rendering.  So scale it down a bit.
+	specAlbedo = (specAlbedo / (specAlbedo + 1.0f)) * fSpec;
+
+	return (sDiffuse + specAlbedo) * lightStrength;
 }
