@@ -72,6 +72,13 @@ struct PosNorm
 	XMFLOAT3 vNormal;
 };
 
+/// <summary>hlsl attribute structure</summary>
+struct RayPayload
+{
+	XMFLOAT4 vColor;
+	XMFLOAT3 vDir;
+};
+
 /// <summary>Simple Sample constants</summary>
 struct ConstantsScene
 {

@@ -27,11 +27,12 @@ cbuffer sScene : register(b0)
 };
 
 RaytracingAccelerationStructure Scene : register(t0);
-RWTexture2D<float4> RenderTarget                : register(u0);
+RWTexture2D<float4> RenderTarget : register(u0);
 
 struct RayPayload
 {
 	float4 vColor;
+	float3 vDir;
 };
 
 [shader("raygeneration")]
@@ -49,7 +50,7 @@ void RayGenerationShader()
 		10000.0
 	};
 
-	RayPayload sPay = { float4(0, 0, 0, 0) };
+	RayPayload sPay = { float4(0, 0, 0, 0), vDirect };
 	TraceRay(Scene,
 		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 		0xFF, 0, 1, 0, sRay, sPay);
@@ -67,35 +68,87 @@ void RayGenerationShader()
 [shader("closesthit")]
 void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
 {
-	float fFbmScale = .05f, fFbmScaleSimplex = .5f;
-	const float2 afFbmScale = float2(.05f, 10.f);
-	float2 sUV = sAttr.vPosition.xz;
+	sPay.vColor = float4(1.0f, .8f, .6f, 1.f);
+}
 
-	// back scale
-	float fTerrain = sAttr.vPosition.y * .1f;
+float SimpleFloor(float2 vPos)
+{
+	float fH = 1.0;// -clamp(fH, 0.0f, 0.5f);
+	fH -= (max(sin(vPos.x * .5 + PI * .5) + cos(vPos.y * .5 - PI * 2.), 1.25) - 2.0) * 0.25;
+	return fH;
+}
 
-	// get base height color
-	float fHeight = max((fTerrain + 1.) * .5f, 0.f);
-	float3 sDiffuse = lerp(float3(.65, .6, .4), sDiffuseAlbedo.xyz, smoothstep(0.5f, 0.7f, fHeight));
+float3 SimpleFloorNorm(float2 vPos, float fStep) 
+{
+	// get floor square
+	float2 vPosOff = float2(vPos.x - fStep, vPos.y);
+	float fL = SimpleFloor(vPosOff);
 
-	// draw grassland
-	float fGrass = frac_noise_simplex(sUV * fFbmScaleSimplex * 2.f);
-	sDiffuse = lerp(lerp(float3(.5f, .3, .2), float3(.3f, .8, .4), max(1.0f - fHeight * 1.2f, fGrass)), sDiffuse, max(.7f, min(fHeight * 1.7f, 1.f)));
+	vPosOff = float2(vPos.x + fStep, vPos.y);
+	float fR = SimpleFloor(vPosOff);
 
-	// to camera vector, ambient light
-	float3 sToEyeW = normalize(sCamPos.xyz - sAttr.vPosition);
-	float4 sAmbient = sAmbientLight * float4(sDiffuse, 1.f);
-	float fNdotL = max(dot(sLightVec, sAttr.vNormal), 0.1f);
-	float3 sStr = sStrength * fNdotL;
+	vPosOff = float2(vPos.x, vPos.y - fStep);
+	float fU = SimpleFloor(vPosOff);
+	
+	vPosOff = float2(vPos.x, vPos.y + fStep);
+	float fD = SimpleFloor(vPosOff);
 
-	// do phong
-	sPay.vColor = sAmbient + float4(BlinnPhong(sDiffuse, sStr, sLightVec, sAttr.vNormal, sToEyeW, smoothstep(.5, .55, abs(fHeight))), 1.f);
+	// calculate normal
+	float3 vTangent = float3(2.0, fR - fL, 0.0);
+	float3 vBitangent = float3(0.0, fD - fU, 2.0);
+	return normalize(cross(vTangent, vBitangent));
+}
+
+float3 GroundLitPos(in float3 vPos, in float3 vRayDir)
+{
+	// get lit position
+	float fD = -vPos.y / vRayDir.y;
+	return float3(vPos.x + vRayDir.x * fD, 0.0, vPos.z + vRayDir.z * fD);
+}
+
+float3 GroundFloor(in float3 vPos, in float3 vRayDir, in float3 vLitPos, 
+	in float3 vNorm = float3(.0f, 1.f, 0.f),
+	in float3 vLight = normalize(float3(.4f, .2f, .3f)),
+	in float3 cLight = float3(.9f, .8f, .7f),
+	in float3 cGround = float3(.3, .4, .5),
+	in float3 cMaterial = float3(.3, .4, .45))
+{
+	// get distance, reflection
+	float fDist = length(vLitPos - vPos);
+	float3 vRef = reflect(vRayDir, vNorm);
+	
+	// calculate fresnel, specular factors
+	float fFresnel = max(dot(vNorm, -vRayDir), 0.0);
+	fFresnel = pow(fFresnel, .3) * 1.1;
+	float fSpecular = max(dot(vRef, vLight), 0.0);
+
+	// do lighting
+	cGround = lerp(cGround, cMaterial * max(dot(vNorm, vLight), 0.0), min(fFresnel, 1.0));
+	cGround += cLight * pow(fSpecular, 220.0);
+
+	return cGround;
 }
 
 [shader("miss")]
 void MissShader(inout RayPayload sPay)
 {
-	sPay.vColor = float4(0.0f, 0.2f, 0.4f, 1.f);
+	float3 vDir = normalize(sPay.vDir);
+
+	float fGradient = abs(vDir.y);
+
+	// ray goes up ?
+	if (vDir.y > 0.0f)
+	{
+		sPay.vColor = lerp(float4(.6f, .6f, 1.f, 1.f), float4(.2f, .2f, 1.f, 1.f), smoothstep(.1f, .3f, fGradient));
+	}
+	else
+	{	
+		float3 vLitPos = GroundLitPos(sCamPos.xyz, sPay.vDir);
+		float fRayDist = length(vLitPos - sCamPos.xyz);
+		float3 vNormal = -SimpleFloorNorm(vLitPos.xz * 100.f, .5f);
+		vNormal = lerp(vNormal, float3(0.f, 1.f, 0.f), clamp(fRayDist * .08f, 0.f, 1.f));
+		sPay.vColor = float4(GroundFloor(sCamPos.xyz, sPay.vDir, vLitPos, vNormal), 1.f);
+	}
 }
 
 [shader("intersection")]
@@ -104,13 +157,5 @@ void IntersectionShader()
 	float fThit = 0.1f;
 	PosNorm sAttr = (PosNorm)0;
 
-	// do volume ray cast - fractal brownian motion
-	if (vrc_fbm(
-		ObjectRayOrigin(),
-		normalize(ObjectRayDirection()),
-		fThit,
-		sAttr))
-	{
-		ReportHit(fThit, 0, sAttr);
-	}
+	ReportHit(fThit, 0, sAttr);
 }

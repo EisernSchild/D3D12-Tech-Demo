@@ -11,6 +11,17 @@
 #ifndef _APP_D3D12_GENERIC
 #define _APP_D3D12_GENERIC
 
+/// <summary>Demos shown in this sample</summary>
+enum struct Demos : unsigned
+{
+	Procedural_heightmap,
+	Water_feature
+};
+/// <summary>number of demos using rasterization</summary>
+static constexpr uint uDemoRasN = 1;
+/// <summary>number of demos using both rasterization and raytracing</summary>
+static constexpr uint uDemoN = 2;
+
 #ifdef _WIN64
 
 /// <summary>
@@ -49,8 +60,8 @@ protected:
 	static signed UpdateConstants(const AppData& sData);
 	/// <summary>clear render target</summary>
 	static void SetAndClearTarget();
-	/// <summary>First draw test function</summary>
-	static signed Draw(const AppData& sData);
+	/// <summary>Demo 00 render method</summary>
+	static signed Draw_Demo_00(const AppData& sData);
 	/// <summary>Compute shader post processing</summary>
 	static void ExecutePost(ID3D12GraphicsCommandList* psCmdList,
 		ID3D12RootSignature* psRootSign,
@@ -76,8 +87,8 @@ protected:
 	static void BuildDXRShaderTables();
 	/// <summary>execute raytracing</summary>
 	static void DoRaytracing();
-	/// <summary>DXR render method</summary>
-	static void DrawDXR();
+	/// <summary>Demo 01 render method</summary>
+	static signed Draw_Demo_01(const AppData& sData);
 	/// <summary>copy RenderMap0 to render target (back buffer)</summary>
 	static void RenderMap2Backbuffer();
 	/// <summary>translate hex tiles by compute shader</summary>
@@ -101,8 +112,6 @@ protected:
 		bool b4xMsaaState = false;
 		/// <summary>true if DXR is supported by device</summary>
 		bool bDXRSupport = false;
-		/// <summary>true if DXR is chosen by user</summary>
-		bool bDXRMode = false;
 		/// <summary>4 x MSAA Quality</summary>
 		UINT u4xMsaaQuality = 0;
 		/// <summary>the screen viewport</summary>
@@ -177,8 +186,10 @@ protected:
 
 	static struct SceneData 
 	{
+		/// <summary>current demo mode</summary>
+		Demos eMode;
 		/// <summary>camera position</summary>
-		XMFLOAT3 sCamPos = XMFLOAT3(0.f, 10.f, 0.f);
+		XMFLOAT3 sCamPos = sCamInit();
 		/// <summary>camera velocity</summary>
 		XMFLOAT3 sCamVelo = {};
 		/// <summary>hexagonal coordinates (camera)</summary>
@@ -189,8 +200,39 @@ protected:
 		XMFLOAT2 sHexXYc = {};
 		/// <summary>constant up vector</summary>
 		const XMVECTOR sUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-		/// <summary>acceleration for translation and rotation</summary>
-		const float fAccelTran = .1f, fAccelRot = 4.f;
+		/// <summary>acceleration for translation</summary>
+		constexpr float fAccelTran()
+		{
+			switch (eMode)
+			{
+			case Demos::Procedural_heightmap: return .1f;
+			case Demos::Water_feature: return .01f;
+			default: break;
+			}
+			return 0.f;
+		}
+		/// <summary>acceleration for rotation</summary>
+		constexpr float fAccelRot()
+		{
+			switch (eMode)
+			{
+			case Demos::Procedural_heightmap: return 4.f;
+			case Demos::Water_feature: return 2.f;
+			default: break;
+			}
+			return 0.f;
+		}
+		/// <summary>start camera position</summary>
+		constexpr XMFLOAT3 sCamInit()
+		{
+			switch (eMode)
+			{
+			case Demos::Procedural_heightmap: return XMFLOAT3(0.f, 10.f, 0.f);
+			case Demos::Water_feature: return XMFLOAT3(0.f, 1.f, -5.f);
+			default: break;
+			}
+			return XMFLOAT3(0.f, 0.f, 0.f);
+		}
 		/// <summary>resistance to velocity</summary>
 		const float fDrag = .995f;
 		/// <summary>camera pitch, yaw</summary>

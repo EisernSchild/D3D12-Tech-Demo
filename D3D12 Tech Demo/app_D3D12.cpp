@@ -332,25 +332,40 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		XINPUT_STATE sState = {};
 		uint32_t uR = XInputGetState(0, &sState);
 		if (uR == ERROR_SUCCESS)
-		{			
+		{
 			// position xz
-			float fThX = ((float)sState.Gamepad.sThumbLX / 32767.f) * fTimeEl * m_sScene.fAccelTran;
-			float fThY = ((float)sState.Gamepad.sThumbLY / 32767.f) * fTimeEl * m_sScene.fAccelTran;
+			float fThX = ((float)sState.Gamepad.sThumbLX / 32767.f) * fTimeEl * m_sScene.fAccelTran();
+			float fThY = ((float)sState.Gamepad.sThumbLY / 32767.f) * fTimeEl * m_sScene.fAccelTran();
 			m_sScene.sCamVelo.x += fThX * cosf(m_sScene.fYaw) - fThY * sinf(m_sScene.fYaw);
 			m_sScene.sCamVelo.z += fThX * sinf(m_sScene.fYaw) + fThY * cosf(m_sScene.fYaw);
 
 			// height y
-			m_sScene.sCamVelo.y += ((float)sState.Gamepad.bRightTrigger / 256.f) * fTimeEl * m_sScene.fAccelTran;
-			m_sScene.sCamVelo.y -= ((float)sState.Gamepad.bLeftTrigger / 256.f) * fTimeEl * m_sScene.fAccelTran;
+			m_sScene.sCamVelo.y += ((float)sState.Gamepad.bRightTrigger / 256.f) * fTimeEl * m_sScene.fAccelTran();
+			m_sScene.sCamVelo.y -= ((float)sState.Gamepad.bLeftTrigger / 256.f) * fTimeEl * m_sScene.fAccelTran();
 
 			// yaw, pitch
-			m_sScene.fYaw -= ((float)sState.Gamepad.sThumbRX / 32767.f) * fTimeEl * m_sScene.fAccelRot;
+			m_sScene.fYaw -= ((float)sState.Gamepad.sThumbRX / 32767.f) * fTimeEl * m_sScene.fAccelRot();
 			m_sScene.fYaw = fmod(m_sScene.fYaw, XM_2PI);
 			m_sScene.fPitch = ((float)sState.Gamepad.sThumbRY / 32767.f) * XM_PIDIV2;
 		}
 
 		// switch mode ? use START button
-		if ((sState.Gamepad.wButtons & 0x0010) && !(uButtonOld & 0x0010)) m_sD3D.bDXRMode = !m_sD3D.bDXRMode;
+		if ((sState.Gamepad.wButtons & 0x0010) && !(uButtonOld & 0x0010)) 
+		{
+			// DXR support ? all demos, otherwise only rasterization demos
+			uint uDmN = m_sD3D.bDXRSupport ? uDemoN : uDemoRasN;
+			uint uNewMode = (uint)m_sScene.eMode + 1;
+			if (uNewMode < uDmN)
+				m_sScene.eMode = (Demos)uNewMode;
+			else
+				m_sScene.eMode = (Demos)0;
+
+			// init scene
+			m_sScene.sCamPos = m_sScene.sCamInit();
+			m_sScene.sCamVelo = {};
+			m_sScene.fPitch = 0.f;
+			m_sScene.fYaw = 0.f;
+		} 
 		uButtonOld = sState.Gamepad.wButtons;
 
 		// word view projection...
@@ -359,8 +374,9 @@ signed App_D3D12::UpdateConstants(const AppData& sData)
 		XMMATRIX sP = XMMatrixPerspectiveFovLH(0.25f * XM_PI, static_cast<float>(m_sClientSize.nW) / static_cast<float>(m_sClientSize.nH), 1.0f, 1000.0f);
 		XMStoreFloat4x4(&sProj, sP);
 
-		// add velo, translate, decelerate		
+		// add velo, clamp y, translate, decelerate		
 		m_sScene.sCamPos = m_sScene.sCamPos + m_sScene.sCamVelo;
+		if (m_sScene.sCamPos.y < 0.f) m_sScene.sCamPos.y = 0.f;
 		XMMATRIX sV =
 			XMMatrixTranslation(-m_sScene.sCamPos.x, -m_sScene.sCamPos.y, -m_sScene.sCamPos.z) *
 			XMMatrixRotationAxis(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), m_sScene.fYaw) *
@@ -491,14 +507,8 @@ void App_D3D12::SetAndClearTarget()
 	m_sD3D.psCmdList->RSSetScissorRects(1, &m_sD3D.sScissorRc);
 }
 
-signed App_D3D12::Draw(const AppData& sData)
+signed App_D3D12::Draw_Demo_00(const AppData& sData)
 {
-	if ((m_sD3D.bDXRSupport) && (m_sD3D.bDXRMode))
-	{
-		DrawDXR();
-		return APP_FORWARD;
-	}
-
 	// reset
 	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
 	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), m_sD3D.psPSO->Get()));
@@ -999,7 +1009,6 @@ signed App_D3D12::BuildGeometry()
 			uAmbitTileN += 6;
 		}
 
-
 		// add the hexagons to the vertices/indices, first hex stays as base
 		m_sScene.uBaseVtcN = (unsigned)asHexagonVtc.size();
 		m_sScene.uBaseIdcN = (unsigned)auHexIdc.size();
@@ -1013,7 +1022,7 @@ signed App_D3D12::BuildGeometry()
 			for (unsigned uJ(0); uJ < m_sScene.uBaseIdcN; uJ++)
 				auHexIdc.push_back(auHexIdc[uJ] + (uI + 1) * m_sScene.uBaseVtcN);
 		}
-		
+
 		// get uav handles, create mesh
 		m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::MeshVtcUav] =
 			CD3DX12_CPU_DESCRIPTOR_HANDLE(m_sD3D.psHeapSRV->GetCPUDescriptorHandleForHeapStart(), (uint)CbvSrvUav_Heap_Idc::MeshVtcUav, m_sD3D.uCbvSrvUavDcSz);
@@ -1109,13 +1118,12 @@ signed App_D3D12::BuildGeometry()
 		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psTileLayout.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
 	}
 
-	// axis-aligned bounding box
-	float fMaxSceneBorder = 1000.f;
+	// axis-aligned bounding box for water feature
 	{
 		D3D12_RAYTRACING_AABB sAABBDc =
 		{
-			-fMaxSceneBorder, -fMaxSceneBorder, -fMaxSceneBorder,
-			 fMaxSceneBorder,  fMaxSceneBorder,  fMaxSceneBorder
+			 0.0f, 0.0f, -0.1f,
+			10.0f, 1.0f,  0.1f
 		};
 		AllocateUploadBuffer(m_sD3D.psDevice.Get(), &sAABBDc, sizeof(sAABBDc), &m_sD3D.psAABB, L"AABB");
 	}
@@ -1145,8 +1153,9 @@ signed App_D3D12::CreateDXRStateObject()
 
 	// set shader config sub object (float4 color float2 barycentrics)
 	auto pcShaderConf = sObjectDc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-	UINT uAttributeSize = sizeof(struct PosNorm);
-	pcShaderConf->Config(4 * sizeof(float), uAttributeSize);
+	UINT uAttributeSz = sizeof(struct PosNorm);
+	UINT uPayloadSz = sizeof(struct RayPayload);
+	pcShaderConf->Config(uPayloadSz, uAttributeSz);
 
 	// set global root signature sub object
 	auto pcGlobalRootSign = sObjectDc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
@@ -1344,7 +1353,7 @@ void App_D3D12::DoRaytracing()
 	DispatchRays(psCmdList, m_sD3D.psDXRStateObject.Get(), &sDispDc);
 }
 
-void App_D3D12::DrawDXR()
+signed App_D3D12::Draw_Demo_01(const AppData& sData)
 {
 	// reset
 	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
@@ -1372,7 +1381,7 @@ void App_D3D12::DrawDXR()
 	m_sD3D.nBackbufferI = (m_sD3D.nBackbufferI + 1) % nSwapchainBufferN;
 
 	// sync
-	FlushCommandQueue();
+	return FlushCommandQueue();
 }
 
 void App_D3D12::RenderMap2Backbuffer()

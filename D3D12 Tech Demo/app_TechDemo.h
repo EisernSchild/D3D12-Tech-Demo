@@ -29,7 +29,15 @@ public:
 	}
 	FUNC_GAME_TASK(OnRenderPipeline0)
 	{
-		return APP_GfxLib::Draw(sData);
+		switch (m_sScene.eMode)
+		{
+		case Demos::Procedural_heightmap:
+			return APP_GfxLib::Draw_Demo_00(sData);
+		case Demos::Water_feature:
+			return APP_GfxLib::Draw_Demo_01(sData);;
+		default: break;
+		}
+		return APP_FORWARD;
 	}
 	FUNC_GAME_TASK(OnRenderPipeline1)
 	{
