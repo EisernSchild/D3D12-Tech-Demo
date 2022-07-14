@@ -3,6 +3,7 @@
 // 
 // SPDX-License-Identifier: MIT
 
+#define _DXR
 #include"vrc.hlsli"
 
 /// basic scene constant buffer
@@ -65,20 +66,14 @@ void RayGenerationShader()
 	RenderTarget[DispatchRaysIndex().xy] = sPay.vColor;
 }
 
-[shader("closesthit")]
-void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
-{
-	sPay.vColor = float4(1.0f, .8f, .6f, 1.f);
-}
-
 float SimpleFloor(float2 vPos)
 {
-	float fH = 1.0;// -clamp(fH, 0.0f, 0.5f);
+	float fH = 1.0;
 	fH -= (max(sin(vPos.x * .5 + PI * .5) + cos(vPos.y * .5 - PI * 2.), 1.25) - 2.0) * 0.25;
 	return fH;
 }
 
-float3 SimpleFloorNorm(float2 vPos, float fStep) 
+float3 SimpleFloorNorm(float2 vPos, float fStep)
 {
 	// get floor square
 	float2 vPosOff = float2(vPos.x - fStep, vPos.y);
@@ -89,7 +84,7 @@ float3 SimpleFloorNorm(float2 vPos, float fStep)
 
 	vPosOff = float2(vPos.x, vPos.y - fStep);
 	float fU = SimpleFloor(vPosOff);
-	
+
 	vPosOff = float2(vPos.x, vPos.y + fStep);
 	float fD = SimpleFloor(vPosOff);
 
@@ -106,27 +101,33 @@ float3 GroundLitPos(in float3 vPos, in float3 vRayDir)
 	return float3(vPos.x + vRayDir.x * fD, 0.0, vPos.z + vRayDir.z * fD);
 }
 
-float3 GroundFloor(in float3 vPos, in float3 vRayDir, in float3 vLitPos, 
+float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	in float3 vNorm = float3(.0f, 1.f, 0.f),
 	in float3 vLight = normalize(float3(.4f, .2f, .3f)),
 	in float3 cLight = float3(.9f, .8f, .7f),
-	in float3 cGround = float3(.3, .4, .5),
+	in float3 cLit = float3(.3, .4, .5),
 	in float3 cMaterial = float3(.3, .4, .45))
 {
 	// get distance, reflection
 	float fDist = length(vLitPos - vPos);
 	float3 vRef = reflect(vRayDir, vNorm);
-	
+
 	// calculate fresnel, specular factors
 	float fFresnel = max(dot(vNorm, -vRayDir), 0.0);
 	fFresnel = pow(fFresnel, .3) * 1.1;
 	float fSpecular = max(dot(vRef, vLight), 0.0);
 
 	// do lighting
-	cGround = lerp(cGround, cMaterial * max(dot(vNorm, vLight), 0.0), min(fFresnel, 1.0));
-	cGround += cLight * pow(fSpecular, 220.0);
+	cLit = lerp(cLit, cMaterial * max(dot(vNorm, vLight), 0.0), min(fFresnel, 1.0));
+	cLit += cLight * pow(fSpecular, 220.0);
 
-	return cGround;
+	return cLit;
+}
+
+[shader("closesthit")]
+void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
+{
+	sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal), 1.f);
 }
 
 [shader("miss")]
@@ -142,12 +143,12 @@ void MissShader(inout RayPayload sPay)
 		sPay.vColor = lerp(float4(.6f, .6f, 1.f, 1.f), float4(.2f, .2f, 1.f, 1.f), smoothstep(.1f, .3f, fGradient));
 	}
 	else
-	{	
+	{
 		float3 vLitPos = GroundLitPos(sCamPos.xyz, sPay.vDir);
 		float fRayDist = length(vLitPos - sCamPos.xyz);
 		float3 vNormal = -SimpleFloorNorm(vLitPos.xz * 100.f, .5f);
 		vNormal = lerp(vNormal, float3(0.f, 1.f, 0.f), clamp(fRayDist * .08f, 0.f, 1.f));
-		sPay.vColor = float4(GroundFloor(sCamPos.xyz, sPay.vDir, vLitPos, vNormal), 1.f);
+		sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, vLitPos, vNormal), 1.f);
 	}
 }
 
@@ -157,5 +158,12 @@ void IntersectionShader()
 	float fThit = 0.1f;
 	PosNorm sAttr = (PosNorm)0;
 
-	ReportHit(fThit, 0, sAttr);
+	// bounding box size and center
+	float3 vAabbSz = float3(10.f, 1.f, .2f);
+	float3 vAabbCn = float3(5.f, .5f, 0.f);
+		
+	if (vrc(ObjectRayOrigin(), normalize(ObjectRayDirection()), Primitive::Cylinder, fThit, sAttr, sTime.x))
+	{
+		ReportHit(fThit, 0, sAttr);
+	}
 }

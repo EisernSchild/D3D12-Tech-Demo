@@ -3,7 +3,21 @@
 // 
 // SPDX-License-Identifier: MIT
 
+// based on code of following sources :
+// Copyright (c) Microsoft
+// Copyright (c) 2013 Inigo Quilez
+// 
+// SPDX-License-Identifier: MIT
+
 #include"fbm.hlsli"
+
+#ifdef _DXR
+// all primitive types enumeration
+enum struct Primitive
+{
+	Cylinder
+};
+#endif
 
 struct PosNorm
 {
@@ -12,7 +26,7 @@ struct PosNorm
 };
 
 // transform a ray based on screen position, camera position and inverse wvp matrix 
-inline void transform_ray(in uint2 sIndex, in float2 sScreenSz, in float4 vCamPos, in float4x4 sWVPrInv, 
+inline void transform_ray(in uint2 sIndex, in float2 sScreenSz, in float4 vCamPos, in float4x4 sWVPrInv,
 	out float3 vOrigin, out float3 vDirection)
 {
 	// center in the middle of the pixel, get screen position
@@ -54,7 +68,10 @@ bool vrc_fbm(
 		fThit = vOri.y - fTerrainY;
 		if (fThit < 0.1f)
 		{
-			// adjust hit position
+			// TODO !! fThit is wrongly used here
+			// TODO !! Add threshold !!
+			
+			// adjust hit position 
 			if (fThit < 0.f)
 			{
 				fThit = abs(fThit);
@@ -79,3 +96,77 @@ bool vrc_fbm(
 
 	return false;
 }
+
+#ifdef _DXR
+
+// Infinite Cylinder - exact
+float sdCylinder(float3 vPos, float3 vC)
+{
+	return length(vPos.xy - vC.xy) - vC.z;
+}
+
+// imports all signed distance methods
+float sdf(in float3 vPos, in Primitive ePrimitive, in float fTime)
+{
+	switch (ePrimitive)
+	{
+	case Primitive::Cylinder:
+	{
+		// align on x axist (xyz -> zyx)
+		float fD = vPos.x + fTime;
+		return sdCylinder(vPos.zyx, float3(0., sin(vPos.x * 2.) * .02 + .5, .006 * (sin(fD * 40.2) + 1.)));
+	}
+	default:break;
+	}
+	return 0.f;
+}
+
+// get normal for hit
+float3 sdCalculateNormal(in float3 vPos, in Primitive ePrimitive, in float fTime)
+{
+	float2 vE = float2(1.0, -1.0) * 0.5773 * 0.0001;
+	return normalize(
+		vE.xyy * sdf(vPos + vE.xyy, ePrimitive, fTime) +
+		vE.yyx * sdf(vPos + vE.yyx, ePrimitive, fTime) +
+		vE.yxy * sdf(vPos + vE.yxy, ePrimitive, fTime) +
+		vE.xxx * sdf(vPos + vE.xxx, ePrimitive, fTime));
+}
+
+// Volume Ray Casting - Fractal Brownian Motion
+bool vrc(in float3 vOri, in float3 vDir, in Primitive ePrimitive, out float fThit, out PosNorm sAttr,
+	in float fTime = 0.f, in const uint uMax = 128, in const float fStepAdjust = 1.f)
+{
+	const float fThreshold = 0.001;
+	float fT = RayTMin();
+	float fStep = sdf(vOri, ePrimitive, fTime);
+	float3 vPos = vOri;
+
+	// march through the AABB
+	uint uI = 0;
+	while (uI++ < uMax && fT <= RayTCurrent())
+	{
+		vPos += fStep * vDir;
+		float fDist = sdf(vPos, ePrimitive, fTime);
+
+		// intersection ?
+		if (fDist <= fThreshold * fT)
+		{
+			float3 vNormal = sdCalculateNormal(vPos, ePrimitive, fTime);
+			if (true) // ValidHit(vPos, vDir, fT, vNormal))
+			{
+				fThit = fT;
+				sAttr.vPosition = vPos;
+				sAttr.vNormal = vNormal;
+				return true;
+			}
+		}
+
+		// raymarch step
+		fStep = fStepAdjust * fDist;
+		fT += fStep;
+	}
+	return false;
+}
+
+
+#endif
