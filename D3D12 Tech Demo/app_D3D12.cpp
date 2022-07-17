@@ -1120,10 +1120,17 @@ signed App_D3D12::BuildGeometry()
 
 	// axis-aligned bounding box for water feature
 	{
+		/*
 		D3D12_RAYTRACING_AABB sAABBDc =
 		{
 			 0.0f, 0.0f, -0.1f,
 			10.0f, 1.0f,  0.1f
+		};
+		*/
+		D3D12_RAYTRACING_AABB sAABBDc =
+		{
+			-1000.0f,  0.0f, -0.5f,
+			 1000.0f, 10.0f,  0.5f
 		};
 		AllocateUploadBuffer(m_sD3D.psDevice.Get(), &sAABBDc, sizeof(sAABBDc), &m_sD3D.psAABB, L"AABB");
 	}

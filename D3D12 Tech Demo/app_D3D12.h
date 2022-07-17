@@ -15,7 +15,7 @@
 enum struct Demos : unsigned
 {
 	Procedural_heightmap,
-	Water_feature
+	Candy_cane
 };
 /// <summary>number of demos using rasterization</summary>
 static constexpr uint uDemoRasN = 1;
@@ -206,7 +206,7 @@ protected:
 			switch (eMode)
 			{
 			case Demos::Procedural_heightmap: return .1f;
-			case Demos::Water_feature: return .01f;
+			case Demos::Candy_cane: return .01f;
 			default: break;
 			}
 			return 0.f;
@@ -217,7 +217,7 @@ protected:
 			switch (eMode)
 			{
 			case Demos::Procedural_heightmap: return 4.f;
-			case Demos::Water_feature: return 2.f;
+			case Demos::Candy_cane: return 2.f;
 			default: break;
 			}
 			return 0.f;
@@ -228,7 +228,7 @@ protected:
 			switch (eMode)
 			{
 			case Demos::Procedural_heightmap: return XMFLOAT3(0.f, 10.f, 0.f);
-			case Demos::Water_feature: return XMFLOAT3(0.f, 1.f, -5.f);
+			case Demos::Candy_cane: return XMFLOAT3(0.f, 1.f, -15.f);
 			default: break;
 			}
 			return XMFLOAT3(0.f, 0.f, 0.f);

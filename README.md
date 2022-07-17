@@ -20,6 +20,12 @@ Missing here : LOD can be easily applied by intersecting the hex triangles for c
 
 Video Link : https://youtu.be/DTHR7ZxROHY
 
+## 2. Candy Land [DXR] : Raytraced endless bent cylinder
+
+[WORK IN PROGRESS]
+
+[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/media/Candy_land_01.png">]
+
 ### Gamepad Controls
 
 LT / RT - steer on Y axis<br>

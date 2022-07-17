@@ -73,6 +73,22 @@ float SimpleFloor(float2 vPos)
 	return fH;
 }
 
+// https://www.shadertoy.com/view/XtByRz
+float3 CandySpiral(float2 vPos, float fTime, float fSpirals = .5f, float fSize = .05f)
+{
+	// distance fom center, angle from center
+	float d = length(vPos) * fSize;
+	float a = atan2(vPos.x, vPos.y) / 3.141592 * fSpirals;
+
+	// spirals !!
+	float v = frac(d + a - fTime);
+
+	return
+		v < .25 ? float3(.67f, .85f, .8f) :
+		v>.5 && v < .75 ? float3(.94f, .71f, .71f)  :
+		float3(1., 1., 1.);
+}
+
 float3 SimpleFloorNorm(float2 vPos, float fStep)
 {
 	// get floor square
@@ -103,10 +119,9 @@ float3 GroundLitPos(in float3 vPos, in float3 vRayDir)
 
 float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	in float3 vNorm = float3(.0f, 1.f, 0.f),
-	in float3 vLight = normalize(float3(.4f, .2f, .3f)),
-	in float3 cLight = float3(.9f, .8f, .7f),
-	in float3 cLit = float3(.3, .4, .5),
-	in float3 cMaterial = float3(.3, .4, .45))
+	in float3 cMaterial = float3(.3, .4, .45),
+	in float3 vLight = normalize(float3(-.4f, .2f, -.3f)),
+	in float3 cLight = float3(.9f, .8f, .7f))
 {
 	// get distance, reflection
 	float fDist = length(vLitPos - vPos);
@@ -118,6 +133,7 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	float fSpecular = max(dot(vRef, vLight), 0.0);
 
 	// do lighting
+	float3 cLit = cMaterial * .8f;
 	cLit = lerp(cLit, cMaterial * max(dot(vNorm, vLight), 0.0), min(fFresnel, 1.0));
 	cLit += cLight * pow(fSpecular, 220.0);
 
@@ -127,14 +143,21 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 [shader("closesthit")]
 void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
 {
-	sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal), 1.f);
+	float fX = sAttr.vPosition.x;
+	float fZ = sAttr.vPosition.z;
+	float3 cCandy = float3(
+		max(.7f, sin(fX * .3f) * .5f + .5f), 
+		max(.6f, cos(fX * .2f) * .5f + .5f),
+		max(.5f, sin(fX * .55f) * .5f + .5f)
+		);
+	cCandy = lerp(cCandy.zxy, cCandy, step(.5, frac(fX + fZ)));
+	sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, cCandy), 1.f);
 }
 
 [shader("miss")]
 void MissShader(inout RayPayload sPay)
 {
 	float3 vDir = normalize(sPay.vDir);
-
 	float fGradient = abs(vDir.y);
 
 	// ray goes up ?
@@ -147,8 +170,11 @@ void MissShader(inout RayPayload sPay)
 		float3 vLitPos = GroundLitPos(sCamPos.xyz, sPay.vDir);
 		float fRayDist = length(vLitPos - sCamPos.xyz);
 		float3 vNormal = -SimpleFloorNorm(vLitPos.xz * 100.f, .5f);
-		vNormal = lerp(vNormal, float3(0.f, 1.f, 0.f), clamp(fRayDist * .08f, 0.f, 1.f));
-		sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, vLitPos, vNormal), 1.f);
+		float fFadeOff = clamp(fRayDist * .01f, 0.f, 1.f);
+		float fFadeOff1 = clamp(fRayDist * .06f, 0.f, 1.f);
+		float3 cCandy = lerp(CandySpiral(vLitPos.xz, sTime.x * .18f), float3(1., 1., 1.), fFadeOff);
+		vNormal = lerp(vNormal, float3(0.f, 1.f, 0.f), fFadeOff1);
+		sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, vLitPos, vNormal, cCandy), 1.f);
 	}
 }
 
@@ -159,10 +185,10 @@ void IntersectionShader()
 	PosNorm sAttr = (PosNorm)0;
 
 	// bounding box size and center
-	float3 vAabbSz = float3(10.f, 1.f, .2f);
-	float3 vAabbCn = float3(5.f, .5f, 0.f);
+	// float3 vAabbSz = float3(10.f, 1.f, .2f);
+	// float3 vAabbCn = float3(5.f, .5f, 0.f);
 		
-	if (vrc(ObjectRayOrigin(), normalize(ObjectRayDirection()), Primitive::Cylinder, fThit, sAttr, sTime.x))
+	if (vrc(ObjectRayOrigin(), normalize(ObjectRayDirection()), Primitive::CylinderBent, fThit, sAttr, sTime.x))
 	{
 		ReportHit(fThit, 0, sAttr);
 	}

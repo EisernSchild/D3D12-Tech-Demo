@@ -33,7 +33,7 @@ public:
 		{
 		case Demos::Procedural_heightmap:
 			return APP_GfxLib::Draw_Demo_00(sData);
-		case Demos::Water_feature:
+		case Demos::Candy_cane:
 			return APP_GfxLib::Draw_Demo_01(sData);;
 		default: break;
 		}
