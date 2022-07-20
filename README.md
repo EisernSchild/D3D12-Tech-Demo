@@ -12,7 +12,7 @@ The hexagonal coordinate system has the decisive advantage that each individual 
 
 For closer terrain this is the best option, but for distant terrain this would need too many triangles to be rendered.
 
-And so since distant terrain has too many triangles to render i did choose the volume ray casting (raymarching) method for distant terrain. Raymarching means, other than raytracing, that the ray "walks" step by step throug the viewport. This technique is used in the compute shader during post processing.
+And so since distant terrain has too many triangles to render i did choose the volume ray casting (raymarching) method for distant terrain. Raymarching means, other than raytracing, that the ray "walks" step by step through the viewport. This technique is used in the compute shader during post processing.
 
 Missing here : LOD can be easily applied by intersecting the hex triangles for closer tiles
 
