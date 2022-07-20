@@ -51,50 +51,53 @@ bool vrc_fbm(
 	in float3 vDir,
 	out float fThit,
 	out PosNorm sAttr,
-	in const int nMaxRaySteps = 40,
+	in const uint uMax = 40,
 	in const float2 afFbmScale = float2(.05f, 10.f),
 	in const float fH = 1.f,
-	in const float fStepAdjust = .6f)
+	in const float fStepAdjust = .7f,
+	in const float fTMin = 0.f,
+	in const float fTMax = 1000.f)
 {
-	// raymarch 
-	float3 vStep = vDir;
-	float fThitPrev = fThit;
-	for (int n = 0; n < nMaxRaySteps; n++)
+	const float fThreshold = 0.00001;
+	float fT = fTMin;
+	float fStep = vOri.y - (fbm(vOri.xz * afFbmScale.x, fH) * afFbmScale.y);
+	float3 vPos = vOri;
+	
+	// march through the AABB
+	uint uI = 0;
+	while (uI++ < uMax && fT <= fTMax)
 	{
-		// get terrain height, this should be precomputed in heighmap
-		float2 vX = vOri.xz * afFbmScale.x;
-		float fTerrainY = fbm(vX, fH) * afFbmScale.y;
+		vPos += fStep * vDir;
+		float fDist = vPos.y - (fbm(vPos.xz * afFbmScale.x, fH) * afFbmScale.y);
 
-		fThitPrev = fThit;
-		fThit = vOri.y - fTerrainY;
-		if (fThit < 0.1f)
+		// intersection ?
+		if (fDist <= fThreshold * fT)
 		{
-			// TODO !! fThit is wrongly used here
-			// TODO !! Add threshold !!
-
-			// adjust hit position 
-			if (fThit < 0.f)
+			// is valid ?
+			if (fT < fTMax)
 			{
-				fThit = abs(fThit);
-				vOri -= vStep * (fThit / (fThit + fThitPrev));
-				fThit = 0.01f;
+				// adjust hit position (last step)
+				fStep = fStepAdjust * fDist;
+				vPos += fStep * vDir;
+				fT += fStep;
+
+				fThit = fT;
+
+				// calculate normal
+				float3 vNormal;
+				fbm_normal(vPos.xz * afFbmScale.x, fH, vPos.y, sAttr.vNormal);
+				vPos.y *= afFbmScale.y;
+
+				// set position
+				sAttr.vPosition = vPos;
+				return true;
 			}
-
-			// calculate normal
-			float3 vNormal;
-			fbm_normal(vX, fH, vOri.y, sAttr.vNormal);
-			vOri.y *= afFbmScale.y;
-
-			// set position
-			sAttr.vPosition = vOri;
-			return true;
 		}
 
 		// raymarch step
-		vStep = vDir * abs(fThit) * fStepAdjust;
-		vOri += vStep;
+		fStep = fStepAdjust * fDist;
+		fT += fStep;
 	}
-
 	return false;
 }
 

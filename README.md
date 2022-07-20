@@ -8,9 +8,7 @@ SPDX-License-Identifier: MIT<br>
 
 For any uneven primitive it is essential to use a hex tiled grid for its mesh in 3D. As we see by a (european) football, manufacturing it would be impossible using square leather pieces.
 
-[<img src="https://upload.wikimedia.org/wikipedia/commons/0/0c/Fussball.jpg">]
-
-The hexagonal coordinate system has the decisive advantage that each individual point is always at the same distance to each of its neighboring points. That is also of use for many other game-relevant calculations, like path finding or fundamental AI.
+The hexagonal coordinate system has the decisive advantage that each individual point is always at the same distance to each of its neighboring points. That is also of use for many other game-relevant calculations, like path finding [1] or fundamental AI.
 
 For closer terrain this is the best option, but for distant terrain this would need too many triangles to be rendered.
 
@@ -18,7 +16,9 @@ And so since distant terrain has too many triangles to render i did choose the v
 
 Missing here : LOD can be easily applied by intersecting the hex triangles for closer tiles
 
-Video Link : https://youtu.be/DTHR7ZxROHY
+Video Link : https://youtu.be/DTHR7ZxROHY <br>
+
+[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/media/Proc_heightmap_01.png">]
 
 ## 2. Candy Land [DXR] : Raytraced endless bent cylinder
 
@@ -32,3 +32,7 @@ LT / RT - steer on Y axis<br>
 Left Stick - steer on XZ axis<br>
 Right Stick - pitch / yaw<br>
 START - switch rendering technique<br>
+
+### References
+
+1. Hex Tiles path finding : https://www.shadertoy.com/view/ssyfWm <br>

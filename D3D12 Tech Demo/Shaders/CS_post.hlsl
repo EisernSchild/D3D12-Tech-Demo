@@ -280,7 +280,7 @@ void main(int3 sGroupTID : SV_GroupThreadID, int3 sDispatchTID : SV_DispatchThre
 				normalize(vDirect),
 				fThit,
 				sAttr,
-				40))
+				64))
 			{
 				float fFbmScale = .05f, fFbmScaleSimplex = .5f;
 				const float2 afFbmScale = float2(.05f, 10.f);
