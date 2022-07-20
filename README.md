@@ -1,6 +1,6 @@
 # D3D12-Tech-Demo
 Direct3D 12 Technology Demonstration<br>
-Copyright © 2022 by Denis Reischl<br>
+Copyright Â© 2022 by Denis Reischl<br>
 
 SPDX-License-Identifier: MIT<br>
 
@@ -24,7 +24,7 @@ Video Link : https://youtu.be/DTHR7ZxROHY <br>
 
 [WORK IN PROGRESS]
 
-[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/media/Candy_land_01.png">]
+[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Candy_land_01.PNG">]
 
 ### Gamepad Controls
 
