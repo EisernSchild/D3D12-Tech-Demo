@@ -18,7 +18,7 @@ Missing here : LOD can be easily applied by intersecting the hex triangles for c
 
 Video Link : https://youtu.be/DTHR7ZxROHY <br>
 
-[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/media/Proc_heightmap_01.png">]
+[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Proc_heightmap_01.PNG">]
 
 ## 2. Candy Land [DXR] : Raytraced endless bent cylinder
 
