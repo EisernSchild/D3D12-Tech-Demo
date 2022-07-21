@@ -129,6 +129,8 @@ float3 GroundLitPos(in float3 vPos, in float3 vRayDir)
 float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	in float3 vNorm = float3(.0f, 1.f, 0.f),
 	in float3 cMaterial = float3(.3, .4, .45),
+	in bool bTranslucent = false,
+	in float fAmbient = 0.2f,
 	in float3 vLight = normalize(float3(-.4f, .2f, -.3f)),
 	in float3 cLight = float3(.9f, .8f, .7f))
 {
@@ -141,11 +143,13 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	fFresnel = pow(fFresnel, .3) * 1.1;
 	float fSpecular = max(dot(vRef, vLight), 0.0);
 
-	// do lighting
-	float3 cLit = cMaterial * .8f;
-	cLit = lerp(cLit, cMaterial * max(dot(vNorm, vLight), 0.0), min(fFresnel, 1.0));
+	// do lighting.. inverse normal for translucent primitives
+	float3 cLit = cMaterial * 0.5f;
+	cLit = lerp(cLit, cMaterial * max(dot(vNorm, vLight), fAmbient), min(fFresnel, 1.0));
+	if (bTranslucent)
+		cLit = lerp(cLit, cMaterial * max(dot(-vNorm, vLight), fAmbient), .2f);
 	cLit += cLight * pow(fSpecular, 220.0);
-
+	
 	return cLit;
 }
 
@@ -167,19 +171,18 @@ void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
 			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, cCandy), 1.f);
 			break;
 		}
-		case ScenePrimitive::CandyDrops:
-		{
-			sPay.vColor = float4(.2f, .2f, .2f, 1.f);
+		case ScenePrimitive::CandyDrops:		{			
+			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, float3(1.f, 0.f, .23f), true, .3f), 1.f);
 			break;
 		}
 		case ScenePrimitive::Donut:
 		{
-			sPay.vColor = float4(.2f, .2f, .2f, 1.f);
+			sPay.vColor = float4(1.f, .2f, 1.f, 1.f);
 			break;
 		}
 		case ScenePrimitive::Mallow:
 		{
-			sPay.vColor = float4(.2f, .2f, .2f, 1.f);
+			sPay.vColor = float4(1.f, .2f, 1.f, 1.f);
 			break;
 		}
 		default:break;
@@ -213,6 +216,7 @@ void MissShader(inout RayPayload sPay)
 [shader("intersection")]
 void IntersectionShader()
 {
+	const float fCandyTranslucency = .4f;
 	float fThit = 0.1f;
 	PosNorm sAttr = (PosNorm)0;
 
@@ -229,7 +233,29 @@ void IntersectionShader()
 		}
 		case ScenePrimitive::CandyDrops:
 		{
-			//ReportHit(fThit, 0., sAttr);
+			// AABB:
+			//  8.0f, 0.0f, -36.f,
+			// 16.0f, 2.0f, -28.f
+			float3 vOri = ObjectRayOrigin();
+			float3 vDir = normalize(ObjectRayDirection());
+
+			fThit = isEllipsoid(vOri, vDir, float3(12.f, .5f, -32.f), float3(.8f, .5f, .5f));
+			if (fThit > 0.0 && fThit <= RayTCurrent())
+			{
+				// TODO !! something similar ? tmin = t2;
+				
+				sAttr.vPosition = vOri + fThit * vDir;
+				sAttr.vNormal = nrEllipsoid(sAttr.vPosition, float3(12.f, .5f, -32.f), float3(.8f, .5f, .5f));
+				
+				// translucency approximation
+				float3 vNormInv = -sAttr.vNormal;
+				sAttr.vPosition += vNormInv * fCandyTranslucency;
+				sAttr.vNormal = nrEllipsoid(sAttr.vPosition, float3(12.f, .5f, -32.f), float3(.8f, .5f, .5f));
+				
+				ReportHit(fThit, 0., sAttr);
+
+				// TODO !! occlusion : occ = 0.5 + 0.5 * nor.y;
+			}
 			break;
 		}
 		case ScenePrimitive::Donut:

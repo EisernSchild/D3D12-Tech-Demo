@@ -141,6 +141,28 @@ float sdCylinderBent(float3 vPos, float2 vC, float fR, float fD)
 	return sdEllipse(vPos.xy - vC.xy, float2(fB, fA));
 }
 
+// ellipsoid centered at the origin with radii ra - intersection
+float isEllipsoid(in float3 ro, in float3 rd, in float3 cn, in float3 ra)
+{
+	float3 oc = ro - cn;
+
+	float3 ocn = oc / ra;
+	float3 rdn = rd / ra;
+
+	float a = dot(rdn, rdn);
+	float b = dot(ocn, rdn);
+	float c = dot(ocn, ocn);
+	float h = b * b - a * (c - 1.0);
+	if (h < 0.0) return -1.0;
+	return (-b - sqrt(h)) / a;
+}
+
+// normal function for intersected ellipsoid
+float3 nrEllipsoid(in float3 pos, in float3 cn, in float3 ra)
+{
+	return normalize((pos - cn) / (ra * ra));
+}
+
 // test function
 float fc(float fX)
 {
