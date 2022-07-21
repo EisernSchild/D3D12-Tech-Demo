@@ -1120,19 +1120,39 @@ signed App_D3D12::BuildGeometry()
 
 	// axis-aligned bounding box for water feature
 	{
-		/*
-		D3D12_RAYTRACING_AABB sAABBDc =
+		// candy loop - bent cylinder ("endless" means -300 < x < +300)
+		D3D12_RAYTRACING_AABB sAABB_Bent_Cyl_Dc =
 		{
-			 0.0f, 0.0f, -0.1f,
-			10.0f, 1.0f,  0.1f
+			-300.0f,  0.0f, -0.5f,
+			 300.0f, 10.0f,  0.5f
 		};
-		*/
-		D3D12_RAYTRACING_AABB sAABBDc =
+		m_sD3D.asAABB.push_back(sAABB_Bent_Cyl_Dc);
+
+		// candy drops
+		D3D12_RAYTRACING_AABB sAABB_Bent_Candy_Dc =
 		{
-			-1000.0f,  0.0f, -0.5f,
-			 1000.0f, 10.0f,  0.5f
+			  8.0f, 0.0f, -36.f,
+			 16.0f, 2.0f, -28.f
 		};
-		AllocateUploadBuffer(m_sD3D.psDevice.Get(), &sAABBDc, sizeof(sAABBDc), &m_sD3D.psAABB, L"AABB");
+		m_sD3D.asAABB.push_back(sAABB_Bent_Candy_Dc);
+
+		// donut
+		D3D12_RAYTRACING_AABB sAABB_Bent_Donut_Dc =
+		{
+			-10.0f, 0.0f, -28.f,
+			 -9.0f, 1.0f, -27.f
+		};
+		m_sD3D.asAABB.push_back(sAABB_Bent_Donut_Dc);
+
+		// mallow
+		D3D12_RAYTRACING_AABB sAABB_Bent_Mallow_Dc =
+		{
+			20.0f, 0.0f, -20.f,
+			21.0f, 1.0f, -19.f
+		};
+		m_sD3D.asAABB.push_back(sAABB_Bent_Mallow_Dc);
+		
+		AllocateUploadBuffer(m_sD3D.psDevice.Get(), m_sD3D.asAABB.data(), m_sD3D.asAABB.size() * sizeof(D3D12_RAYTRACING_AABB), &m_sD3D.psAABB, L"AABB");
 	}
 
 	return APP_FORWARD;
@@ -1192,7 +1212,7 @@ signed App_D3D12::CreateDXRAcceleration()
 	{
 		/// aabbs
 		sGeoDc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
-		sGeoDc.AABBs.AABBCount = 1;
+		sGeoDc.AABBs.AABBCount = (UINT64)m_sD3D.asAABB.size();
 		sGeoDc.AABBs.AABBs.StrideInBytes = sizeof(D3D12_RAYTRACING_AABB);
 		sGeoDc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 		sGeoDc.AABBs.AABBs.StartAddress = m_sD3D.psAABB->GetGPUVirtualAddress();

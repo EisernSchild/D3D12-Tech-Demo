@@ -180,7 +180,9 @@ protected:
 		ComPtr<ID3D12Resource> psRayGenTable;
 		/// <summary>intersection shader table</summary>
 		ComPtr<ID3D12Resource> psIntersectionTable;
-		/// <summary>axis-aligned bounding box</summary>
+		/// <summary>axis-aligned bounding boxes descriptions</summary>
+		std::vector<D3D12_RAYTRACING_AABB> asAABB = {};
+		/// <summary>axis-aligned bounding boxes resource</summary>
 		ComPtr<ID3D12Resource> psAABB;
 	} m_sD3D;
 

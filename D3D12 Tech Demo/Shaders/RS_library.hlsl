@@ -6,6 +6,15 @@
 #define _DXR
 #include"vrc.hlsli"
 
+// scene primitives
+enum struct ScenePrimitive
+{
+	CandyLoop,
+	CandyDrops,
+	Donut,
+	Mallow
+};
+
 /// basic scene constant buffer
 cbuffer sScene : register(b0)
 {
@@ -143,15 +152,38 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 [shader("closesthit")]
 void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
 {
-	float fX = sAttr.vPosition.x;
-	float fZ = sAttr.vPosition.z;
-	float3 cCandy = float3(
-		max(.7f, sin(fX * .3f) * .5f + .5f), 
-		max(.6f, cos(fX * .2f) * .5f + .5f),
-		max(.5f, sin(fX * .55f) * .5f + .5f)
-		);
-	cCandy = lerp(cCandy.zxy, cCandy, step(.5, frac(fX + fZ)));
-	sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, cCandy), 1.f);
+	switch ((ScenePrimitive)PrimitiveIndex())
+	{
+		case ScenePrimitive::CandyLoop:
+		{
+			float fX = sAttr.vPosition.x;
+			float fZ = sAttr.vPosition.z;
+			float3 cCandy = float3(
+				max(.7f, sin(fX * .3f) * .5f + .5f),
+				max(.6f, cos(fX * .2f) * .5f + .5f),
+				max(.5f, sin(fX * .55f) * .5f + .5f)
+				);
+			cCandy = lerp(cCandy.zxy, cCandy, step(.5, frac(fX + fZ)));
+			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, cCandy), 1.f);
+			break;
+		}
+		case ScenePrimitive::CandyDrops:
+		{
+			sPay.vColor = float4(.2f, .2f, .2f, 1.f);
+			break;
+		}
+		case ScenePrimitive::Donut:
+		{
+			sPay.vColor = float4(.2f, .2f, .2f, 1.f);
+			break;
+		}
+		case ScenePrimitive::Mallow:
+		{
+			sPay.vColor = float4(.2f, .2f, .2f, 1.f);
+			break;
+		}
+		default:break;
+	}	
 }
 
 [shader("miss")]
@@ -184,12 +216,32 @@ void IntersectionShader()
 	float fThit = 0.1f;
 	PosNorm sAttr = (PosNorm)0;
 
-	// bounding box size and center
-	// float3 vAabbSz = float3(10.f, 1.f, .2f);
-	// float3 vAabbCn = float3(5.f, .5f, 0.f);
-		
-	if (vrc(ObjectRayOrigin(), normalize(ObjectRayDirection()), Primitive::CylinderBent, fThit, sAttr, sTime.x))
+	switch ((ScenePrimitive)PrimitiveIndex())
 	{
-		ReportHit(fThit, 0, sAttr);
+		case ScenePrimitive::CandyLoop:
+		{
+			// candy loop - bent cylinder ("endless" means -300 < x < +300)
+			if (vrc(ObjectRayOrigin(), normalize(ObjectRayDirection()), Primitive::CylinderBent, fThit, sAttr, sTime.x))
+			{
+				ReportHit(fThit, 0, sAttr);
+			}
+			break;
+		}
+		case ScenePrimitive::CandyDrops:
+		{
+			//ReportHit(fThit, 0., sAttr);
+			break;
+		}
+		case ScenePrimitive::Donut:
+		{
+			//ReportHit(fThit, 0., sAttr);
+			break;
+		}
+		case ScenePrimitive::Mallow:
+		{
+			//ReportHit(fThit, 0., sAttr);
+			break;
+		}
+		default:break;
 	}
 }
