@@ -171,8 +171,9 @@ void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
 			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, cCandy), 1.f);
 			break;
 		}
-		case ScenePrimitive::CandyDrops:		{			
-			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, float3(1.f, 0.f, .23f), true, .3f), 1.f);
+		case ScenePrimitive::CandyDrops:		
+		{
+			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, float3(1.f, sAttr.vColor), true, .3f), 1.f);
 			break;
 		}
 		case ScenePrimitive::Donut:
@@ -216,7 +217,6 @@ void MissShader(inout RayPayload sPay)
 [shader("intersection")]
 void IntersectionShader()
 {
-	const float fCandyTranslucency = .4f;
 	float fThit = 0.1f;
 	PosNorm sAttr = (PosNorm)0;
 
@@ -233,25 +233,17 @@ void IntersectionShader()
 		}
 		case ScenePrimitive::CandyDrops:
 		{
-			// AABB:
-			//  8.0f, 0.0f, -36.f,
-			// 16.0f, 2.0f, -28.f
+			//
 			float3 vOri = ObjectRayOrigin();
 			float3 vDir = normalize(ObjectRayDirection());
 
-			fThit = isEllipsoid(vOri, vDir, float3(12.f, .5f, -32.f), float3(.8f, .5f, .5f));
+			// render a circle of candies
+			fThit = sdCircularEllipsoids(vOri, vDir, 5.f, 1.5f, sAttr.vNormal, sAttr.vColor, sTime.x);
 			if (fThit > 0.0 && fThit <= RayTCurrent())
 			{
-				// TODO !! something similar ? tmin = t2;
-				
+				// normal already set
 				sAttr.vPosition = vOri + fThit * vDir;
-				sAttr.vNormal = nrEllipsoid(sAttr.vPosition, float3(12.f, .5f, -32.f), float3(.8f, .5f, .5f));
-				
-				// translucency approximation
-				float3 vNormInv = -sAttr.vNormal;
-				sAttr.vPosition += vNormInv * fCandyTranslucency;
-				sAttr.vNormal = nrEllipsoid(sAttr.vPosition, float3(12.f, .5f, -32.f), float3(.8f, .5f, .5f));
-				
+				sAttr.vColor = clamp(sAttr.vColor, float2(.8, .8), float2(1., 1.));
 				ReportHit(fThit, 0., sAttr);
 
 				// TODO !! occlusion : occ = 0.5 + 0.5 * nor.y;

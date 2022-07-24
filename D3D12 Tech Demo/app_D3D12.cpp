@@ -1131,8 +1131,8 @@ signed App_D3D12::BuildGeometry()
 		// candy drops
 		D3D12_RAYTRACING_AABB sAABB_Bent_Candy_Dc =
 		{
-			  8.0f, 0.0f, -36.f,
-			 16.0f, 2.0f, -28.f
+			  4.0f, 0.0f, -40.f,
+			 20.0f, 4.0f, -24.f
 		};
 		m_sD3D.asAABB.push_back(sAABB_Bent_Candy_Dc);
 

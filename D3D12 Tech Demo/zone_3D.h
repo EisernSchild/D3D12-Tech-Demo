@@ -70,6 +70,7 @@ struct PosNorm
 {
 	XMFLOAT3 vPosition;
 	XMFLOAT3 vNormal;
+	XMFLOAT2 vColor;
 };
 
 /// <summary>hlsl attribute structure</summary>

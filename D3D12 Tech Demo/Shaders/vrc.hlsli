@@ -24,6 +24,7 @@ struct PosNorm
 {
 	float3 vPosition;
 	float3 vNormal;
+	float2 vColor;
 };
 
 // transform a ray based on screen position, camera position and inverse wvp matrix 
@@ -90,6 +91,7 @@ bool vrc_fbm(
 
 				// set position
 				sAttr.vPosition = vPos;
+				sAttr.vColor = (float2)0;
 				return true;
 			}
 		}
@@ -102,6 +104,15 @@ bool vrc_fbm(
 }
 
 #ifdef _DXR
+
+// rotate 2D
+float2 rotate(float2 vV, float fA)
+{
+	float fS = sin(fA);
+	float fC = cos(fA);
+	float2x2 mR = float2x2(fC, -fS, fS, fC);
+	return mul(vV, mR);
+}
 
 // Infinite Cylinder - exact
 float sdCylinder(float3 vPos, float3 vC)
@@ -118,7 +129,7 @@ float sdEllipse(float2 vPos, float2 vAB)
 	float2 vVe = vABi * float2(vAB2.x - vAB2.y, vAB2.y - vAB2.x);
 
 	float2 vT = float2(0.70710678118654752, 0.70710678118654752);
-	for (int i = 0; i < 3; i++) {
+	for (int nI = 0; nI < 3; nI++) {
 		float2 vV = vVe * vT * vT * vT;
 		float2 vU = normalize(pAbs - vV) * length(vT * vAB - vV);
 		float2 vW = vABi * (vV + vU);
@@ -141,26 +152,76 @@ float sdCylinderBent(float3 vPos, float2 vC, float fR, float fD)
 	return sdEllipse(vPos.xy - vC.xy, float2(fB, fA));
 }
 
-// ellipsoid centered at the origin with radii ra - intersection
-float isEllipsoid(in float3 ro, in float3 rd, in float3 cn, in float3 ra)
+// ellipsoid centered at the origin with radii fRad - intersection
+float isEllipsoid(in float3 vOri, in float3 vDir, in float3 vCen, in float3 fRad)
 {
-	float3 oc = ro - cn;
+	float3 vOc = vOri - vCen;
 
-	float3 ocn = oc / ra;
-	float3 rdn = rd / ra;
+	float3 vOcn = vOc / fRad;
+	float3 vRdn = vDir / fRad;
 
-	float a = dot(rdn, rdn);
-	float b = dot(ocn, rdn);
-	float c = dot(ocn, ocn);
-	float h = b * b - a * (c - 1.0);
-	if (h < 0.0) return -1.0;
-	return (-b - sqrt(h)) / a;
+	float fA = dot(vRdn, vRdn);
+	float fB = dot(vOcn, vRdn);
+	float fC = dot(vOcn, vOcn);
+	float fH = fB * fB - fA * (fC - 1.0);
+	if (fH < 0.0) return -1.0;
+	return (-fB - sqrt(fH)) / fA;
 }
 
 // normal function for intersected ellipsoid
-float3 nrEllipsoid(in float3 pos, in float3 cn, in float3 ra)
+float3 nrEllipsoid(in float3 vPos, in float3 vCen, in float3 fRad)
 {
-	return normalize((pos - cn) / (ra * ra));
+	return normalize((vPos - vCen) / (fRad * fRad));
+}
+
+// circular repitition
+float sdCircularEllipsoids(in float3 vOri, in float3 vDir, in float fRad, in float fSpc, out float3 vNormal, out float2 vIdH, in float fTime)
+{
+	// make grid
+	float2 fId0 = round(vOri.xz / fSpc);
+
+	// snap to circle
+	if (dot(fId0, fId0) > fRad * fRad) fId0 = round(normalize(fId0) * fRad);
+
+	// TODO !! this is a signed distance method, for intersected primitives
+	// loop through the radius accordingly
+
+	// scan neighbors
+	float fThit = -1.f;
+	for (int nJ = -16; nJ <= 16; nJ++)
+		for (int nI = -16; nI <= 16; nI++)
+		{
+			// is in radius ?
+			float2 vId = fId0 + float2(nI, nJ);
+			if (dot(vId, vId) <= fRad * fRad)
+			{
+				// shift origin
+				float3 vQ = vOri - fSpc * float3(vId.x, 0.f, vId.y);
+
+				// rotate and lift ellipsoid
+				float fC = sqrt(dot(vId, vId));
+				float3 vRad = (fC < (fRad * .33)) ? float3(1.f, 1.5f, 1.f) : (fC < (fRad * .66)) ? float3(1.5f, 1.f, 1.f) : float3(1.f, 1.f, 1.5f);
+				vRad *= fSpc * .15f;
+				float3 vPosE = float3(12.f, 1.5f + fC * sin(fTime * fC) * .2f, -32.f);
+
+				// ellipsoid intersection ?
+				float fH1 = isEllipsoid(vQ, vDir, vPosE, vRad);
+				if (fH1 >= 0.f)
+				{
+					// set nearest hit
+					fThit = (fThit >= 0.f) ? min(fThit, fH1) : fH1;
+
+					// nearest == current ?
+					if (fThit == fH1)
+					{
+						float3 vPosition = vQ + fThit * vDir;
+						vNormal = nrEllipsoid(vPosition, vPosE, vRad);
+						vIdH = vId;
+					}
+				}
+			}
+		}
+	return fThit;
 }
 
 // test function
