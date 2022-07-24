@@ -124,6 +124,8 @@ protected:
 		ComPtr<ID3D12RootSignature> psRootSign = nullptr;
 		/// <summary>shaders root signature</summary>
 		ComPtr<ID3D12RootSignature> psDXRRootSign = nullptr;
+		/// <summary>shaders root signature (local)</summary>
+		// ComPtr<ID3D12RootSignature> psDXRRootSignL = nullptr;
 		/// <summary>constant buffer view descriptor heap</summary>
 		ComPtr<ID3D12DescriptorHeap> psHeapSRV = nullptr;
 		/// <summary>sampler state descriptor heap</summary>
@@ -180,6 +182,10 @@ protected:
 		ComPtr<ID3D12Resource> psRayGenTable;
 		/// <summary>intersection shader table</summary>
 		ComPtr<ID3D12Resource> psIntersectionTable;
+		/// <summary>miss group dxr stride</summary>
+		UINT uStrideMiss;
+		/// <summary>hit group dxr stride</summary>
+		UINT uStrideHit;
 		/// <summary>axis-aligned bounding boxes descriptions</summary>
 		std::vector<D3D12_RAYTRACING_AABB> asAABB = {};
 		/// <summary>axis-aligned bounding boxes resource</summary>

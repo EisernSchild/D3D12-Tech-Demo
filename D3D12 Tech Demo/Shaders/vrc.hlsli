@@ -27,6 +27,67 @@ struct PosNorm
 	float2 vColor;
 };
 
+// Math Library
+
+// Orthographic projection : ba = (b.an)an
+float2 ortho_proj(float2 vA, float2 vB)
+{
+	float2 vAn = normalize(vA);
+	return dot(vB, vAn) * vAn;
+}
+
+// rotate 2D
+float2 rotate(float2 vV, float fA)
+{
+	float fS = sin(fA);
+	float fC = cos(fA);
+	float2x2 mR = float2x2(fC, -fS, fS, fC);
+	return mul(vV, mR);
+}
+
+// Hex Grid Library
+
+/// Cartesian to hex coordinates
+float2 HexUV(float2 vXy)
+{
+	// hex coords       (u, v) = (          .5 * x + .5 * y,        y ) 
+	// hex coord scaled (u, v) = ((sqrt(3.f) * x + y) / 3.f, y / 1.5f )
+	return float2((sqrt(3.f) * vXy.x + vXy.y) / 3.f, vXy.y / 1.5f);
+}
+
+/// Hex to cartesian coordinates
+float2 HexXY(float2 vUv)
+{
+	// get cartesian coords
+	return float2((vUv.x * 3.f - vUv.y * 1.5f) / sqrt(3.f), vUv.y * 1.5f);
+}
+
+// provide hex grid
+float HexGrid(float2 vPt)
+{
+	const float2 vNext = float2(1.5f / sqrt(3.f), 1.5f);
+	const float fTD = length(vNext);
+
+	// get approx. hexagonal center coords
+	float2 vUvC = round(HexUV(vPt));
+
+	// get approx. cartesian hex center
+	float2 vPtC = HexXY(vUvC);
+
+	// get local coords absolut, adjust x
+	float2 vPtLc = abs(vPt - vPtC);
+	if (vPtLc.x > (fTD * .5)) vPtLc.x = fTD - vPtLc.x;
+
+	// project point on constant tile vector
+	float2 vPtN = ortho_proj(vNext, vPtLc);
+
+	// get distance, adjust again
+	float fD = max(vPtLc.x, length(vPtN));
+	if (fD > (fTD * .5)) fD = fTD - fD;
+
+	return fD;
+}
+
 // transform a ray based on screen position, camera position and inverse wvp matrix 
 inline void transform_ray(in uint2 sIndex, in float2 sScreenSz, in float4 vCamPos, in float4x4 sWVPrInv,
 	out float3 vOrigin, out float3 vDirection)
@@ -104,15 +165,6 @@ bool vrc_fbm(
 }
 
 #ifdef _DXR
-
-// rotate 2D
-float2 rotate(float2 vV, float fA)
-{
-	float fS = sin(fA);
-	float fC = cos(fA);
-	float2x2 mR = float2x2(fC, -fS, fS, fC);
-	return mul(vV, mR);
-}
 
 // Infinite Cylinder - exact
 float sdCylinder(float3 vPos, float3 vC)

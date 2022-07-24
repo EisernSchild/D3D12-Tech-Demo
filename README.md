@@ -20,11 +20,16 @@ Video Link : https://youtu.be/DTHR7ZxROHY <br>
 
 [<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Proc_heightmap_01.PNG">]
 
-## 2. Candy Land [DXR] : Raytraced endless bent cylinder
+## 2. Candy Land [DXR] : Raytraced procedural sweets
+
+[X] Candy loop
+[X] Scotch mints
+[O] Donut
+[O] Mallow
 
 [WORK IN PROGRESS]
 
-[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Candy_land_01.PNG">]
+[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Candy_land_02.PNG">]
 
 ### Gamepad Controls
 

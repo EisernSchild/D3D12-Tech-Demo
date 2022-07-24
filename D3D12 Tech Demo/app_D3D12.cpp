@@ -7,10 +7,14 @@
 #include "CompiledShaders\RS_library.hlsl.h"
 
 const wchar_t* s_atHitGroup = L"HitGroup";
+const wchar_t* s_atHitGroupSh = L"HitGroupSh";
 const wchar_t* s_atRaygen = L"RayGenerationShader";
 const wchar_t* s_atClosestHit = L"ClosestHitShader";
 const wchar_t* s_atMiss = L"MissShader";
+const wchar_t* s_atClosestHitSh = L"ClosestHitShaderSh";
+const wchar_t* s_atMissSh = L"MissShaderSh";
 const wchar_t* s_atIntersection = L"IntersectionShader";
+// const wchar_t* s_atIntersectionSh = L"IntersectionShaderSh";
 
 HWND App_Windows::m_pHwnd = nullptr;
 App_Windows::Client App_Windows::m_sClientSize;
@@ -751,6 +755,15 @@ signed App_D3D12::CreateRootSignatures()
 
 		CD3DX12_ROOT_SIGNATURE_DESC sGlobalDc(3, asSlotRootParam);
 		ThrowIfFailed(CreateRootSignature(m_sD3D.psDevice.Get(), sGlobalDc, &m_sD3D.psDXRRootSign));
+
+		/*
+		// local
+		{
+			CD3DX12_ROOT_SIGNATURE_DESC sLocalDc(D3D12_DEFAULT);
+			sLocalDc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+			ThrowIfFailed(CreateRootSignature(m_sD3D.psDevice.Get(), sGlobalDc, &m_sD3D.psDXRRootSignL));
+		}
+		*/
 	}
 
 	return APP_FORWARD;
@@ -1128,7 +1141,7 @@ signed App_D3D12::BuildGeometry()
 		};
 		m_sD3D.asAABB.push_back(sAABB_Bent_Cyl_Dc);
 
-		// candy drops
+		// scotch mints
 		D3D12_RAYTRACING_AABB sAABB_Bent_Candy_Dc =
 		{
 			  4.0f, 0.0f, -40.f,
@@ -1166,31 +1179,57 @@ signed App_D3D12::CreateDXRStateObject()
 	auto psLibrary = sObjectDc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
 	D3D12_SHADER_BYTECODE sLibCode = CD3DX12_SHADER_BYTECODE((void*)g_pRS_library, ARRAYSIZE(g_pRS_library));
 	psLibrary->SetDXILLibrary(&sLibCode);
+	/*
 	psLibrary->DefineExport(s_atRaygen);
 	psLibrary->DefineExport(s_atClosestHit);
 	psLibrary->DefineExport(s_atMiss);
+	psLibrary->DefineExport(s_atClosestHitSh);
+	psLibrary->DefineExport(s_atMissSh);
 	psLibrary->DefineExport(s_atIntersection);
+	psLibrary->DefineExport(s_atIntersectionSh);
+	*/
 
-	// set hit group sub object
+	// set hit group sub object (main)
 	auto pcHitG = sObjectDc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
 	pcHitG->SetClosestHitShaderImport(s_atClosestHit);
 	pcHitG->SetIntersectionShaderImport(s_atIntersection);
 	pcHitG->SetHitGroupExport(s_atHitGroup);
 	pcHitG->SetHitGroupType(D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
 
+	// set hit group sub object (shadow)
+	auto pcHitGSh = sObjectDc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+	pcHitGSh->SetClosestHitShaderImport(s_atClosestHitSh);
+	pcHitGSh->SetIntersectionShaderImport(s_atIntersection);
+	pcHitGSh->SetHitGroupExport(s_atHitGroupSh);
+	pcHitGSh->SetHitGroupType(D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
+
 	// set shader config sub object (float4 color float2 barycentrics)
 	auto pcShaderConf = sObjectDc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
 	UINT uAttributeSz = sizeof(struct PosNorm);
 	UINT uPayloadSz = sizeof(struct RayPayload);
 	pcShaderConf->Config(uPayloadSz, uAttributeSz);
-
+	
+	/*
+	// local root signature... not workin ??
+	auto pcLocalRootSgn = sObjectDc.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
+	pcLocalRootSgn->SetRootSignature(m_sD3D.psDXRRootSignL.Get());
+	// shader association
+	auto pcRootSignAsc = sObjectDc.CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
+	pcRootSignAsc->SetSubobjectToAssociate(*pcLocalRootSgn);
+	pcRootSignAsc->AddExport(s_atRaygen);
+	pcRootSignAsc->AddExport(s_atMiss);
+	pcRootSignAsc->AddExport(s_atMissSh);
+	pcRootSignAsc->AddExport(s_atHitGroup);
+	pcRootSignAsc->AddExport(s_atHitGroupSh);
+	*/
+	
 	// set global root signature sub object
 	auto pcGlobalRootSign = sObjectDc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
 	pcGlobalRootSign->SetRootSignature(m_sD3D.psDXRRootSign.Get());
 
-	// set pipeline config sub object (~ primary rays only = 1)
+	// set pipeline config sub object
 	auto pcPipelineConf = sObjectDc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-	pcPipelineConf->Config(1);
+	pcPipelineConf->Config(2);
 
 	ThrowIfFailed(m_sD3D.psDevice.Get()->CreateStateObject(sObjectDc, IID_PPV_ARGS(m_sD3D.psDXRStateObject.ReleaseAndGetAddressOf())));
 
@@ -1239,9 +1278,6 @@ signed App_D3D12::CreateDXRAcceleration()
 	// get required sizes - top
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO sTopInfoDc = {};
 	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS sTopInputsDc = {};
-	sTopInputsDc.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	sTopInputsDc.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-	sTopInputsDc.NumDescs = 1;
 	sTopInputsDc.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 	sTopInputsDc.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
 	sTopInputsDc.NumDescs = 1;
@@ -1311,12 +1347,19 @@ void App_D3D12::BuildDXRShaderTables()
 {
 	auto psDevice = m_sD3D.psDevice.Get();
 	UINT uIdSz = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-	void* pvRayGenId, * pvMissId, * pvHitGroupId;
+	void* pvRayGenId, * pvMissId, * pvHitGroupId, * pvMissIdSh, * pvHitGroupIdSh;
 	auto GetShaderIdentifiers = [&](auto* psObjectProp)
 	{
 		pvRayGenId = psObjectProp->GetShaderIdentifier(s_atRaygen);
 		pvMissId = psObjectProp->GetShaderIdentifier(s_atMiss);
 		pvHitGroupId = psObjectProp->GetShaderIdentifier(s_atHitGroup);
+		pvMissIdSh = psObjectProp->GetShaderIdentifier(s_atMissSh);
+		pvHitGroupIdSh = psObjectProp->GetShaderIdentifier(s_atHitGroupSh);
+		TRACE_HEX(pvRayGenId);
+		TRACE_HEX(pvMissId);
+		TRACE_HEX(pvHitGroupId);
+		TRACE_HEX(pvMissIdSh);
+		TRACE_HEX(pvHitGroupIdSh);
 	};
 
 	// get shader identifiers
@@ -1333,16 +1376,20 @@ void App_D3D12::BuildDXRShaderTables()
 
 	// Miss shader table
 	{
-		ShaderTable cMissShaderTable(psDevice, 1, uIdSz, L"MissShaderTable");
+		ShaderTable cMissShaderTable(psDevice, 2, uIdSz, L"MissShaderTable");
 		cMissShaderTable.Add(ShaderRecord(pvMissId, uIdSz));
+		cMissShaderTable.Add(ShaderRecord(pvMissIdSh, uIdSz));
 		m_sD3D.psMissTable = cMissShaderTable.GetResource();
+		m_sD3D.uStrideMiss = cMissShaderTable.GetShaderRecordSize();
 	}
 
 	// Hit group shader table
 	{
-		ShaderTable cHitGroupShaderTable(psDevice, 1, uIdSz, L"HitGroupShaderTable");
+		ShaderTable cHitGroupShaderTable(psDevice, 2, uIdSz, L"HitGroupShaderTable");
 		cHitGroupShaderTable.Add(ShaderRecord(pvHitGroupId, uIdSz));
+		cHitGroupShaderTable.Add(ShaderRecord(pvHitGroupIdSh, uIdSz));
 		m_sD3D.psHitGroupTable = cHitGroupShaderTable.GetResource();
+		m_sD3D.uStrideHit = cHitGroupShaderTable.GetShaderRecordSize();
 	}
 }
 
@@ -1358,10 +1405,10 @@ void App_D3D12::DoRaytracing()
 		dispatchDesc->Height = (uint)m_sClientSize.nH;
 		dispatchDesc->HitGroupTable.StartAddress = m_sD3D.psHitGroupTable->GetGPUVirtualAddress();
 		dispatchDesc->HitGroupTable.SizeInBytes = m_sD3D.psHitGroupTable->GetDesc().Width;
-		dispatchDesc->HitGroupTable.StrideInBytes = dispatchDesc->HitGroupTable.SizeInBytes;
+		dispatchDesc->HitGroupTable.StrideInBytes = m_sD3D.uStrideHit;
 		dispatchDesc->MissShaderTable.StartAddress = m_sD3D.psMissTable->GetGPUVirtualAddress();
 		dispatchDesc->MissShaderTable.SizeInBytes = m_sD3D.psMissTable->GetDesc().Width;
-		dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
+		dispatchDesc->MissShaderTable.StrideInBytes = m_sD3D.uStrideMiss;
 		dispatchDesc->RayGenerationShaderRecord.StartAddress = m_sD3D.psRayGenTable->GetGPUVirtualAddress();
 		dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_sD3D.psRayGenTable->GetDesc().Width;
 		psCmdList->SetPipelineState1(stateObject);

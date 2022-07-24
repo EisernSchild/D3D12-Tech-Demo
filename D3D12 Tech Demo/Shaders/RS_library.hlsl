@@ -63,7 +63,7 @@ void RayGenerationShader()
 	RayPayload sPay = { float4(0, 0, 0, 0), vDirect };
 	TraceRay(Scene,
 		RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
-		0xFF, 0, 1, 0, sRay, sPay);
+		0xFF, 0, 2, 0, sRay, sPay);
 
 	// vignette
 	float2 sUV = ((float2(float(DispatchRaysIndex().x), float(DispatchRaysIndex().y)) / sViewport.zw) - .5) * 2.;
@@ -131,8 +131,8 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	in float3 cMaterial = float3(.3, .4, .45),
 	in bool bTranslucent = false,
 	in float fAmbient = 0.2f,
-	in float3 vLight = normalize(float3(-.4f, .2f, -.3f)),
-	in float3 cLight = float3(.9f, .8f, .7f))
+	in float3 cLight = float3(.9f, .8f, .7f),
+	in float3 vLight = normalize(float3(-.4f, .2f, -.3f)))
 {
 	// get distance, reflection
 	float fDist = length(vLitPos - vPos);
@@ -149,8 +149,20 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	if (bTranslucent)
 		cLit = lerp(cLit, cMaterial * max(dot(-vNorm, vLight), fAmbient), .2f);
 	cLit += cLight * pow(fSpecular, 220.0);
+	cLit = clamp(cLit, 0.f, 1.f);
 	
 	return cLit;
+}
+
+// checkers, hexagonal
+float checkers_hex(in float2 vPt, in float2 vDpdx, in float2 vDpdy)
+{
+	// filter kernel
+	float2 vW = abs(vDpdx) + abs(vDpdy) + 0.001;
+	// integral
+	float fIn = (HexGrid(vPt + .5 * vW) + HexGrid(vPt - .5 * vW)) * .5f;
+
+	return lerp(smoothstep(.6, .65, fIn), fIn, length(vW));
 }
 
 [shader("closesthit")]
@@ -187,7 +199,7 @@ void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
 			break;
 		}
 		default:break;
-	}	
+	}
 }
 
 [shader("miss")]
@@ -203,15 +215,51 @@ void MissShader(inout RayPayload sPay)
 	}
 	else
 	{
+		// get ground uv, render checkers, no ddx, ddy in dxr !! 
 		float3 vLitPos = GroundLitPos(sCamPos.xyz, sPay.vDir);
 		float fRayDist = length(vLitPos - sCamPos.xyz);
+		float fCh = checkers_hex(vLitPos.xz, fRayDist * .002f, fRayDist * .002f);
+		float3 cCandy = lerp(CandySpiral(vLitPos.xz, sTime.x * .18f), float3(.9, .8, .7), fCh);
+
+		// get little dents
 		float3 vNormal = -SimpleFloorNorm(vLitPos.xz * 100.f, .5f);
-		float fFadeOff = clamp(fRayDist * .01f, 0.f, 1.f);
-		float fFadeOff1 = clamp(fRayDist * .06f, 0.f, 1.f);
-		float3 cCandy = lerp(CandySpiral(vLitPos.xz, sTime.x * .18f), float3(1., 1., 1.), fFadeOff);
-		vNormal = lerp(vNormal, float3(0.f, 1.f, 0.f), fFadeOff1);
-		sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, vLitPos, vNormal, cCandy), 1.f);
+
+		// get shadow
+		float fThisSh = 0.f;
+		bool bShadow = false;
+		RayDesc sRaySh = { vLitPos, 0.001, normalize(float3(-.4f, .2f, -.3f)), 20.0 };
+		RayPayload sPaySh = { float4(-1.0f, -1.0f, -1.0f, -1.0f), normalize(float3(-.4f, .2f, -.3f)) };				
+		TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 1, 2, 1, sRaySh, sPaySh);
+		if (sPaySh.vColor.a >= 0.f)
+		{
+			bShadow = true;
+			cCandy *= .8f + clamp(sPay.vColor.a * .04, .0, .15);
+		}
+		
+		// fade out normals and add reflection
+		float fFadeOff = clamp(fRayDist * .06f, 0.f, 1.f);
+		vNormal = lerp(vNormal, float3(0.f, 1.f, 0.f), fFadeOff);
+		fFadeOff = clamp(fRayDist * .008f, 0.f, 1.f);
+		float3 vRef = reflect(vDir, normalize(float3(0., 1., 0.)));
+		cCandy = lerp(cCandy, float3(.9f, .9f, 1.f) - abs(vRef.y), fFadeOff);
+		sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, vLitPos, vNormal, cCandy, false, 0.8f, bShadow ? float3(.0f, .0f, .0f) : float3(.9f, .8f, .9f)), 1.f);
 	}
+}
+
+// shadow closest hit...
+[shader("closesthit")]
+void ClosestHitShaderSh(inout RayPayload sPay, in PosNorm sAttr)
+{
+	// set length to alpha
+	float fRayDistSh = length(sAttr.vPosition - ObjectRayOrigin());
+	sPay.vColor = float4(0.f, 0.f, 0.f, fRayDistSh);
+}
+
+// miss shader for shadows... returns alpha -1.
+[shader("miss")]
+void MissShaderSh(inout RayPayload sPay)
+{
+	sPay.vColor = float4(0.f, 0.f, 0.f, -1.f);
 }
 
 [shader("intersection")]
@@ -219,7 +267,7 @@ void IntersectionShader()
 {
 	float fThit = 0.1f;
 	PosNorm sAttr = (PosNorm)0;
-
+	
 	switch ((ScenePrimitive)PrimitiveIndex())
 	{
 		case ScenePrimitive::CandyLoop:
@@ -238,7 +286,7 @@ void IntersectionShader()
 			float3 vDir = normalize(ObjectRayDirection());
 
 			// render a circle of candies
-			fThit = sdCircularEllipsoids(vOri, vDir, 5.f, 1.5f, sAttr.vNormal, sAttr.vColor, sTime.x);
+			fThit = sdCircularEllipsoids(vOri, vDir, 4.f, 1.8f, sAttr.vNormal, sAttr.vColor, sTime.x);
 			if (fThit > 0.0 && fThit <= RayTCurrent())
 			{
 				// normal already set
@@ -263,3 +311,14 @@ void IntersectionShader()
 		default:break;
 	}
 }
+
+/*
+/// not used now... second intersection shader
+[shader("intersection")]
+void IntersectionShaderSh()
+{
+	float fThit = 0.1f;
+	PosNorm sAttr = (PosNorm)0;
+	//ReportHit(fThit, 0, sAttr);
+}
+*/
