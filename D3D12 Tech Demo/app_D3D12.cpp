@@ -817,7 +817,7 @@ signed App_D3D12::CreateShaders()
 		m_sD3D.psPsoCsPost->SetName(L"compute post PSO");
 	}
 
-	// compute shader post
+	// compute shader hex trans
 	{
 		// compile...
 		D3D_SHADER_MACRO sMacro = {};

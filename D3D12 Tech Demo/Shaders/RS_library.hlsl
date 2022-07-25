@@ -136,7 +136,7 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 {
 	// get distance, reflection
 	float fDist = length(vLitPos - vPos);
-	float3 vRef = reflect(vRayDir, vNorm);
+	float3 vRef = normalize(reflect(vRayDir, vNorm));
 
 	// calculate fresnel, specular factors
 	float fFresnel = max(dot(vNorm, -vRayDir), 0.0);
@@ -207,11 +207,20 @@ void MissShader(inout RayPayload sPay)
 {
 	float3 vDir = normalize(sPay.vDir);
 	float fGradient = abs(vDir.y);
+	float3 cLight = float3(.9f, .8f, .7f);
+	float3 vLight = normalize(float3(-.4f, .2f, -.3f));
+	float3 cSky = float3(1.0f, .4f, 0.f);
 
 	// ray goes up ?
 	if (vDir.y > 0.0f)
 	{
-		sPay.vColor = lerp(float4(.6f, .6f, 1.f, 1.f), float4(.2f, .2f, 1.f, 1.f), smoothstep(.1f, .3f, fGradient));
+		// render horizon
+		sPay.vColor = lerp(float4(.8, .6, .5, 1.), float4(cSky, 1.f), smoothstep(.01f, .1f, fGradient));
+
+		// render a sun
+		float fSun = max(dot(vDir, vLight), 0.0);
+		sPay.vColor += float4(cLight, 0.f) * pow(fSun, 100.0) * 2.f;
+		sPay.vColor = clamp(sPay.vColor, 0.f, 1.f);
 	}
 	else
 	{
@@ -236,17 +245,31 @@ void MissShader(inout RayPayload sPay)
 			cCandy *= .8f + clamp(sPay.vColor.a * .04, .0, .15);
 		}
 		
-		// fade out normals and add reflection
+		// fade out normals
 		float fFadeOff = clamp(fRayDist * .06f, 0.f, 1.f);
-		vNormal = lerp(vNormal, float3(0.f, 1.f, 0.f), fFadeOff);
-		fFadeOff = clamp(fRayDist * .008f, 0.f, 1.f);
-		float3 vRef = reflect(vDir, normalize(float3(0., 1., 0.)));
-		cCandy = lerp(cCandy, float3(.9f, .9f, 1.f) - abs(vRef.y), fFadeOff);
+		vNormal = normalize(lerp(vNormal, float3(0.f, 1.f, 0.f), fFadeOff));
+
+		// get reflection ray
+		float3 vRef = normalize(reflect(sPay.vDir, vNormal));
+		float fThisRf = 0.f;
+		RayDesc sRayRf = { vLitPos, 0.001, vRef, 1000.0 };
+		RayPayload sPayRf = { float4(-1.0f, -1.0f, -1.0f, -1.0f), vRef };
+		TraceRay(Scene, RAY_FLAG_NONE, 0xFF, 1, 2, 1, sRayRf, sPayRf);
+
+		// reflect by sky color or dark gray
+		float3 cRef = cSky;
+		if (sPayRf.vColor.a >= 0.f) cRef = float3(.3f, .3f, .3f);
+		cCandy = lerp(cCandy, cRef, bShadow ? 0.4f : 0.2f);
+
+		// do lighting
 		sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, vLitPos, vNormal, cCandy, false, 0.8f, bShadow ? float3(.0f, .0f, .0f) : float3(.9f, .8f, .9f)), 1.f);
+
+		// blend with horizon to avoid flaws   
+		sPay.vColor = lerp(sPay.vColor, float4(.8, .6, .5, 1.), clamp(fRayDist * .008f, 0., 1.));
 	}
 }
 
-// shadow closest hit...
+// shadow  closest hit...
 [shader("closesthit")]
 void ClosestHitShaderSh(inout RayPayload sPay, in PosNorm sAttr)
 {
