@@ -1131,7 +1131,7 @@ signed App_D3D12::BuildGeometry()
 		m_sD3D.psDevice->CreateShaderResourceView(m_sD3D.psTileLayout.Get(), &sSrvDc, m_sD3D.asCbvSrvUavCpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
 	}
 
-	// axis-aligned bounding box for water feature
+	// axis-aligned bounding box for sweets
 	{
 		// candy loop - bent cylinder ("endless" means -300 < x < +300)
 		D3D12_RAYTRACING_AABB sAABB_Bent_Cyl_Dc =
@@ -1149,19 +1149,19 @@ signed App_D3D12::BuildGeometry()
 		};
 		m_sD3D.asAABB.push_back(sAABB_Bent_Candy_Dc);
 
-		// donut
+		// taffy candy bar
 		D3D12_RAYTRACING_AABB sAABB_Bent_Donut_Dc =
 		{
-			-10.0f, 0.0f, -28.f,
-			 -9.0f, 1.0f, -27.f
+			 -2.0f, 0.0f, -17.f,
+			14.0f, 1.0f, -15.f
 		};
 		m_sD3D.asAABB.push_back(sAABB_Bent_Donut_Dc);
 
 		// mallow
 		D3D12_RAYTRACING_AABB sAABB_Bent_Mallow_Dc =
 		{
-			20.0f, 0.0f, -20.f,
-			21.0f, 1.0f, -19.f
+			19.0f, 0.0f, -20.f,
+			25.0f, 4.0f, -16.f
 		};
 		m_sD3D.asAABB.push_back(sAABB_Bent_Mallow_Dc);
 		
@@ -1179,15 +1179,6 @@ signed App_D3D12::CreateDXRStateObject()
 	auto psLibrary = sObjectDc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
 	D3D12_SHADER_BYTECODE sLibCode = CD3DX12_SHADER_BYTECODE((void*)g_pRS_library, ARRAYSIZE(g_pRS_library));
 	psLibrary->SetDXILLibrary(&sLibCode);
-	/*
-	psLibrary->DefineExport(s_atRaygen);
-	psLibrary->DefineExport(s_atClosestHit);
-	psLibrary->DefineExport(s_atMiss);
-	psLibrary->DefineExport(s_atClosestHitSh);
-	psLibrary->DefineExport(s_atMissSh);
-	psLibrary->DefineExport(s_atIntersection);
-	psLibrary->DefineExport(s_atIntersectionSh);
-	*/
 
 	// set hit group sub object (main)
 	auto pcHitG = sObjectDc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
@@ -1208,20 +1199,6 @@ signed App_D3D12::CreateDXRStateObject()
 	UINT uAttributeSz = sizeof(struct PosNorm);
 	UINT uPayloadSz = sizeof(struct RayPayload);
 	pcShaderConf->Config(uPayloadSz, uAttributeSz);
-	
-	/*
-	// local root signature... not workin ??
-	auto pcLocalRootSgn = sObjectDc.CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
-	pcLocalRootSgn->SetRootSignature(m_sD3D.psDXRRootSignL.Get());
-	// shader association
-	auto pcRootSignAsc = sObjectDc.CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
-	pcRootSignAsc->SetSubobjectToAssociate(*pcLocalRootSgn);
-	pcRootSignAsc->AddExport(s_atRaygen);
-	pcRootSignAsc->AddExport(s_atMiss);
-	pcRootSignAsc->AddExport(s_atMissSh);
-	pcRootSignAsc->AddExport(s_atHitGroup);
-	pcRootSignAsc->AddExport(s_atHitGroupSh);
-	*/
 	
 	// set global root signature sub object
 	auto pcGlobalRootSign = sObjectDc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();

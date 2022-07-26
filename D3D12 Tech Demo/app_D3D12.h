@@ -124,8 +124,6 @@ protected:
 		ComPtr<ID3D12RootSignature> psRootSign = nullptr;
 		/// <summary>shaders root signature</summary>
 		ComPtr<ID3D12RootSignature> psDXRRootSign = nullptr;
-		/// <summary>shaders root signature (local)</summary>
-		// ComPtr<ID3D12RootSignature> psDXRRootSignL = nullptr;
 		/// <summary>constant buffer view descriptor heap</summary>
 		ComPtr<ID3D12DescriptorHeap> psHeapSRV = nullptr;
 		/// <summary>sampler state descriptor heap</summary>
@@ -214,7 +212,7 @@ protected:
 			switch (eMode)
 			{
 			case Demos::Procedural_heightmap: return .1f;
-			case Demos::Candy_cane: return .01f;
+			case Demos::Candy_cane: return .05f;
 			default: break;
 			}
 			return 0.f;

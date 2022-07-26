@@ -11,7 +11,7 @@ enum struct ScenePrimitive
 {
 	CandyLoop,
 	CandyDrops,
-	Donut,
+	TaffyCandy,
 	Mallow
 };
 
@@ -131,6 +131,8 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	in float3 cMaterial = float3(.3, .4, .45),
 	in bool bTranslucent = false,
 	in float fAmbient = 0.2f,
+	in float fSpecularPow = 220.f,
+	in float fSpecularAdj = 1.f,
 	in float3 cLight = float3(.9f, .8f, .7f),
 	in float3 vLight = normalize(float3(-.4f, .2f, -.3f)))
 {
@@ -148,7 +150,7 @@ float3 SceneLighting(in float3 vPos, in float3 vRayDir, in float3 vLitPos,
 	cLit = lerp(cLit, cMaterial * max(dot(vNorm, vLight), fAmbient), min(fFresnel, 1.0));
 	if (bTranslucent)
 		cLit = lerp(cLit, cMaterial * max(dot(-vNorm, vLight), fAmbient), .2f);
-	cLit += cLight * pow(fSpecular, 220.0);
+	cLit += cLight * pow(fSpecular, fSpecularPow) * fSpecularAdj;
 	cLit = clamp(cLit, 0.f, 1.f);
 	
 	return cLit;
@@ -185,17 +187,33 @@ void ClosestHitShader(inout RayPayload sPay, in PosNorm sAttr)
 		}
 		case ScenePrimitive::CandyDrops:		
 		{
+			// candy drops
 			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, float3(1.f, sAttr.vColor), true, .3f), 1.f);
 			break;
 		}
-		case ScenePrimitive::Donut:
+		case ScenePrimitive::TaffyCandy:
 		{
-			sPay.vColor = float4(1.f, .2f, 1.f, 1.f);
+			// taffy candy bar
+			float3 vCol = (fmod(sAttr.vColor.y + sin(sAttr.vColor.x) * .2f, .8f) > .4f) ? float3(1., .9, .8) : float3(.8, .5, .2);
+			float3 vNormal = normalize(sAttr.vNormal + float3(sin(sAttr.vColor.x * 20.f) * .05f, 0.f, cos(sAttr.vColor.y * 20.f) * .05f));
+
+			// fade out normals
+			float fRayDist = length(sAttr.vPosition - sCamPos.xyz);
+			float fFadeOff = clamp(fRayDist * .06f, 0.f, 1.f);
+			vNormal = normalize(lerp(vNormal, sAttr.vNormal, fFadeOff));
+
+			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, vNormal, vCol, false, .3f, 10.f), 1.f);
 			break;
 		}
 		case ScenePrimitive::Mallow:
 		{
-			sPay.vColor = float4(1.f, .2f, 1.f, 1.f);
+			// marsh mallow cube
+			float fStep = sAttr.vPosition.y + sin(sAttr.vPosition.x * 10.f) * .1f + sin(sAttr.vPosition.z * 10.f) * .1f;
+			float3 vCol = (fStep < 1.) ? float3(1., 1., 1.) :
+				(fStep < 2.) ? lerp(float3(1., .5, .5), float3(1., .8, .8), smoothstep(0.0f, 0.2f, frac(fStep))) :
+				(fStep < 3.) ? lerp(float3(.8, 1., 1.), float3(.5, 1., 1.), smoothstep(0.8f, 1.0f, frac(fStep))) : float3(1., 1., 1.);
+
+			sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, sAttr.vPosition, sAttr.vNormal, vCol, false, .4f, 10.f, .2f), 1.f);
 			break;
 		}
 		default:break;
@@ -262,7 +280,7 @@ void MissShader(inout RayPayload sPay)
 		cCandy = lerp(cCandy, cRef, bShadow ? 0.4f : 0.2f);
 
 		// do lighting
-		sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, vLitPos, vNormal, cCandy, false, 0.8f, bShadow ? float3(.0f, .0f, .0f) : float3(.9f, .8f, .9f)), 1.f);
+		sPay.vColor = float4(SceneLighting(sCamPos.xyz, sPay.vDir, vLitPos, vNormal, cCandy, false, 0.8f, 220.f, 1.f, bShadow ? float3(.0f, .0f, .0f) : float3(.9f, .8f, .9f)), 1.f);
 
 		// blend with horizon to avoid flaws   
 		sPay.vColor = lerp(sPay.vColor, float4(.8, .6, .5, 1.), clamp(fRayDist * .008f, 0., 1.));
@@ -290,13 +308,15 @@ void IntersectionShader()
 {
 	float fThit = 0.1f;
 	PosNorm sAttr = (PosNorm)0;
+	float3 vOri = ObjectRayOrigin();
+	float3 vDir = normalize(ObjectRayDirection());
 	
 	switch ((ScenePrimitive)PrimitiveIndex())
 	{
 		case ScenePrimitive::CandyLoop:
 		{
 			// candy loop - bent cylinder ("endless" means -300 < x < +300)
-			if (vrc(ObjectRayOrigin(), normalize(ObjectRayDirection()), Primitive::CylinderBent, fThit, sAttr, sTime.x))
+			if (vrc(vOri, vDir, Primitive::CylinderBent, fThit, sAttr, sTime.x))
 			{
 				ReportHit(fThit, 0, sAttr);
 			}
@@ -304,31 +324,52 @@ void IntersectionShader()
 		}
 		case ScenePrimitive::CandyDrops:
 		{
-			//
-			float3 vOri = ObjectRayOrigin();
-			float3 vDir = normalize(ObjectRayDirection());
-
 			// render a circle of candies
-			fThit = sdCircularEllipsoids(vOri, vDir, 4.f, 1.8f, sAttr.vNormal, sAttr.vColor, sTime.x);
+			fThit = iCircularEllipsoids(vOri, vDir, 3.f, 2.5f, sAttr.vNormal, sAttr.vColor, sTime.x);
 			if (fThit > 0.0 && fThit <= RayTCurrent())
 			{
 				// normal already set
 				sAttr.vPosition = vOri + fThit * vDir;
 				sAttr.vColor = clamp(sAttr.vColor, float2(.8, .8), float2(1., 1.));
 				ReportHit(fThit, 0., sAttr);
-
-				// TODO !! occlusion : occ = 0.5 + 0.5 * nor.y;
 			}
 			break;
 		}
-		case ScenePrimitive::Donut:
+		case ScenePrimitive::TaffyCandy:
 		{
-			//ReportHit(fThit, 0., sAttr);
+			// render a rounded box
+			float3 vCen = float3(6.f, .32f, -16.f);
+			float3 vBoxSz = float3(8.f, .1f, .75f);
+			fThit = iRoundedBox(vOri, vDir, vCen, vBoxSz, 0.2f);
+			if (fThit > 0.0 && fThit <= RayTCurrent())
+			{
+				// set pos, normal, set uv as color
+				sAttr.vPosition = vOri + fThit * vDir;
+				sAttr.vColor = abs(sAttr.vPosition.xz + vCen.xz * .5f);
+				sAttr.vNormal = nRoundedBox(sAttr.vPosition, vCen, vBoxSz);
+				ReportHit(fThit, 0., sAttr);
+			}
 			break;
 		}
 		case ScenePrimitive::Mallow:
 		{
-			//ReportHit(fThit, 0., sAttr);
+			// render a capsule
+			const float3 vCen = float3(22.f, 2.f, -18.f);
+			const float3 vBoxSz = float3(8.f, .1f, .75f);
+			const float3 vA = float3(-1., 0., 0.);
+			const float3 vB = float3(1., 0., 0.);
+			const float fR = 2.;
+			fThit = iCapsule(vOri, vDir, vCen, vA, vB, fR);
+			// fThit = iSphere4(vOri, vDir, vCen, 2.f);
+			if (fThit > 0.0 && fThit <= RayTCurrent())
+			{
+				// set pos, normal, set uv as color
+				sAttr.vPosition = vOri + fThit * vDir;
+				sAttr.vColor = abs(sAttr.vPosition.xz + vCen.xz * .5f);
+				sAttr.vNormal = nCapsule(sAttr.vPosition, vCen, vA, vB, fR);
+				// sAttr.vNormal = nSphere4(sAttr.vPosition, vCen);
+				ReportHit(fThit, 0., sAttr);
+			}
 			break;
 		}
 		default:break;
@@ -337,6 +378,7 @@ void IntersectionShader()
 
 /*
 /// not used now... second intersection shader
+/// do intersection here without normal calculation for shadows
 [shader("intersection")]
 void IntersectionShaderSh()
 {

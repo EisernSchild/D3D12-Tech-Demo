@@ -12,7 +12,7 @@ The hexagonal coordinate system has the decisive advantage that each individual 
 
 For closer terrain this is the best option, but for distant terrain this would need too many triangles to be rendered.
 
-And so since distant terrain has too many triangles to render i did choose the volume ray casting (raymarching) method for distant terrain. Raymarching means, other than raytracing, that the ray "walks" step by step through the viewport. This technique is used in the compute shader during post processing.
+And so since that is the case i did choose the volume ray casting (raymarching) method for distant terrain. Raymarching means, other than raytracing, that the ray "walks" step by step through the viewport. This technique is used in the compute shader during post processing.
 
 Missing here : LOD can be easily applied by intersecting the hex triangles for closer tiles
 
@@ -22,14 +22,17 @@ Video Link : https://youtu.be/DTHR7ZxROHY <br>
 
 ## 2. Candy Land [DXR] : Raytraced procedural sweets
 
-[X] Candy loop
-[X] Scotch mints
-[O] Donut
-[O] Mallow
+* Scotch mints, Taffy candy bar, Marshmallow
 
-[WORK IN PROGRESS]
+Since these are very simple primitives (ellipsoids, rounded box, capsule), we can use "ray intersection" functions here. That is, it can be calculated mathematically if and where the ray intersects the primitive to calculate the final position and normal of the resulting fragment. These intersectors work much faster than volume ray casting.
 
-[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Candy_land_02.PNG">]
+* Candy loop
+
+Since the (endless) cylinder is intensely curved here, we cannot use an intersector here, that would be very complicated, at least mathematically. So here we also use Volume Ray Casting as we did in the first example.
+
+Video Link : https://youtu.be/SRQhpNWdLUs <br>
+
+[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Candy_land_03.PNG">]
 
 ### Gamepad Controls
 

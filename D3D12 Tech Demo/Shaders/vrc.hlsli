@@ -3,7 +3,7 @@
 // 
 // SPDX-License-Identifier: MIT
 
-// based on code of following sources :
+// based on code with following rights :
 // Copyright (c) Microsoft
 // Copyright (c) 2013 Inigo Quilez
 // 
@@ -166,6 +166,8 @@ bool vrc_fbm(
 
 #ifdef _DXR
 
+// signed distance functions https://iquilezles.org/articles/distfunctions/
+
 // Infinite Cylinder - exact
 float sdCylinder(float3 vPos, float3 vC)
 {
@@ -204,13 +206,15 @@ float sdCylinderBent(float3 vPos, float2 vC, float fR, float fD)
 	return sdEllipse(vPos.xy - vC.xy, float2(fB, fA));
 }
 
-// ellipsoid centered at the origin with radii fRad - intersection
-float isEllipsoid(in float3 vOri, in float3 vDir, in float3 vCen, in float3 fRad)
+// intersectors https://iquilezles.org/articles/intersectors
+
+// ellipsoid centered at the origin with radii vRad
+float iEllipsoid(in float3 vOri, in float3 vDir, in float3 vCen, in float3 vRad)
 {
 	float3 vOc = vOri - vCen;
 
-	float3 vOcn = vOc / fRad;
-	float3 vRdn = vDir / fRad;
+	float3 vOcn = vOc / vRad;
+	float3 vRdn = vDir / vRad;
 
 	float fA = dot(vRdn, vRdn);
 	float fB = dot(vOcn, vRdn);
@@ -220,31 +224,230 @@ float isEllipsoid(in float3 vOri, in float3 vDir, in float3 vCen, in float3 fRad
 	return (-fB - sqrt(fH)) / fA;
 }
 
-// normal function for intersected ellipsoid
-float3 nrEllipsoid(in float3 vPos, in float3 vCen, in float3 fRad)
+// intersect a ray with a rounded box
+float iRoundedBox(in float3 vOri, in float3 vDir, in float3 vCen, in float3 vSize, in float fRad)
 {
-	return normalize((vPos - vCen) / (fRad * fRad));
+	float3 vOc = vOri - vCen;
+
+	// bounding box
+	float3 m = 1.0 / vDir;
+	float3 n = m * vOc;
+	float3 k = abs(m) * (vSize + fRad);
+	float3 t1 = -n - k;
+	float3 t2 = -n + k;
+	float tN = max(max(t1.x, t1.y), t1.z);
+	float tF = min(min(t2.x, t2.y), t2.z);
+	if (tN > tF || tF < 0.0) return -1.0;
+	float t = tN;
+
+	// convert to first octant
+	float3 pos = vOc + t * vDir;
+	float3 s = sign(pos);
+	vOc *= s;
+	vDir *= s;
+	pos *= s;
+
+	// faces
+	pos -= vSize;
+	pos = max(pos.xyz, pos.yzx);
+	if (min(min(pos.x, pos.y), pos.z) < 0.0) return t;
+
+	// some precomputation
+	float3 oc = vOc - vSize;
+	float3 dd = vDir * vDir;
+	float3 oo = oc * oc;
+	float3 od = oc * vDir;
+	float ra2 = fRad * fRad;
+
+	t = 1e20;
+
+	// corner
+	{
+		float b = od.x + od.y + od.z;
+		float c = oo.x + oo.y + oo.z - ra2;
+		float h = b * b - c;
+		if (h > 0.0) t = -b - sqrt(h);
+	}
+
+	// edge X
+	{
+		float a = dd.y + dd.z;
+		float b = od.y + od.z;
+		float c = oo.y + oo.z - ra2;
+		float h = b * b - a * c;
+		if (h > 0.0)
+		{
+			h = (-b - sqrt(h)) / a;
+			if (h > 0.0 && h < t && abs(vOc.x + vDir.x * h) < vSize.x) t = h;
+		}
+	}
+	// edge Y
+	{
+		float a = dd.z + dd.x;
+		float b = od.z + od.x;
+		float c = oo.z + oo.x - ra2;
+		float h = b * b - a * c;
+		if (h > 0.0)
+		{
+			h = (-b - sqrt(h)) / a;
+			if (h > 0.0 && h < t && abs(vOc.y + vDir.y * h) < vSize.y) t = h;
+		}
+	}
+	// edge Z
+	{
+		float a = dd.x + dd.y;
+		float b = od.x + od.y;
+		float c = oo.x + oo.y - ra2;
+		float h = b * b - a * c;
+		if (h > 0.0)
+		{
+			h = (-b - sqrt(h)) / a;
+			if (h > 0.0 && h < t && abs(vOc.z + vDir.z * h) < vSize.z) t = h;
+		}
+	}
+
+	if (t > 1e19) t = -1.0;
+
+	return t;
 }
 
-// circular repitition
-float sdCircularEllipsoids(in float3 vOri, in float3 vDir, in float fRad, in float fSpc, out float3 vNormal, out float2 vIdH, in float fTime)
+// f(x,y,z) = x^4 + y^4 + z^4 - ra^4
+float iSphere4(in float3 vOri, in float3 vDir, in float3 vCen, in float fRad)
 {
-	// make grid
-	float2 fId0 = round(vOri.xz / fSpc);
+	float3 vOc = vOri - vCen;
 
-	// snap to circle
-	if (dot(fId0, fId0) > fRad * fRad) fId0 = round(normalize(fId0) * fRad);
+	// -----------------------------
+	// solve quartic equation
+	// -----------------------------
 
-	// TODO !! this is a signed distance method, for intersected primitives
-	// loop through the radius accordingly
+	float r2 = fRad * fRad;
 
-	// scan neighbors
+	float3 d2 = vDir * vDir; float3 d3 = d2 * vDir;
+	float3 o2 = vOc * vOc; float3 o3 = o2 * vOc;
+
+	float ka = 1.0 / dot(d2, d2);
+
+	float k3 = ka * dot(vOc, d3);
+	float k2 = ka * dot(o2, d2);
+	float k1 = ka * dot(o3, vDir);
+	float k0 = ka * (dot(o2, o2) - r2 * r2);
+
+	// -----------------------------
+	// solve cubic
+	// -----------------------------
+
+	float c2 = k2 - k3 * k3;
+	float c1 = k1 + 2.0 * k3 * k3 * k3 - 3.0 * k3 * k2;
+	float c0 = k0 - 3.0 * k3 * k3 * k3 * k3 + 6.0 * k3 * k3 * k2 - 4.0 * k3 * k1;
+
+	float p = c2 * c2 + c0 / 3.0;
+	float q = c2 * c2 * c2 - c2 * c0 + c1 * c1;
+
+	float h = q * q - p * p * p;
+
+	// -----------------------------
+	// skip the case of three real solutions for the cubic, which involves four
+	// complex solutions for the quartic, since we know this objcet is convex
+	// -----------------------------
+	if (h < 0.0) return -1.0;
+
+	// one real solution, two complex (conjugated)
+	float sh = sqrt(h);
+
+	float s = sign(q + sh) * pow(abs(q + sh), 1.0 / 3.0); // cuberoot
+	float t = sign(q - sh) * pow(abs(q - sh), 1.0 / 3.0); // cuberoot
+	float2  w = float2(s + t, s - t);
+
+	// -----------------------------
+	// the quartic will have two real solutions and two complex solutions.
+	// we only want the real ones
+	// -----------------------------
+
+#if 1
+	float2  v = float2(w.x + c2 * 4.0, w.y * sqrt(3.0)) * 0.5;
+	float r = length(v);
+	return -abs(v.y) / sqrt(r + v.x) - c1 / r - k3;
+#else
+	float r = sqrt(c2 * c2 + w.x * w.x + 2.0 * w.x * c2 - c0);
+	return -sqrt(3.0 * w.y * w.y / (4.0 * r + w.x * 2.0 + c2 * 8.0)) - c1 / r - k3;
+#endif    
+}
+
+// intersect capsule
+float iCapsule(in float3 vOri, in float3 vDir, in float3 vCen, in float3 pa, in float3 pb, in float r)
+{
+	float3 vOc = vOri - vCen;
+
+	float3  ba = pb - pa;
+	float3  oa = vOc - pa;
+
+	float baba = dot(ba, ba);
+	float bard = dot(ba, vDir);
+	float baoa = dot(ba, oa);
+	float rdoa = dot(vDir, oa);
+	float oaoa = dot(oa, oa);
+
+	float a = baba - bard * bard;
+	float b = baba * rdoa - baoa * bard;
+	float c = baba * oaoa - baoa * baoa - r * r * baba;
+	float h = b * b - a * c;
+	if (h >= 0.0)
+	{
+		float t = (-b - sqrt(h)) / a;
+		float y = baoa + t * bard;
+		// body
+		if (y > 0.0 && y < baba) return t;
+		// caps
+		float3 oc = (y <= 0.0) ? oa : vOc - pb;
+		b = dot(vDir, oc);
+		c = dot(oc, oc) - r * r;
+		h = b * b - c;
+		if (h > 0.0) return -b - sqrt(h);
+	}
+	return -1.0;
+}
+
+// normal function for intersected ellipsoid
+float3 nEllipsoid(in float3 vPos, in float3 vCen, in float3 vRad)
+{
+	return normalize((vPos - vCen) / (vRad * vRad));
+}
+
+// normal of a rounded box
+float3 nRoundedBox(in float3 vPos, in float3 vCen, in float3 vSiz)
+{
+	float3 vPc = vPos - vCen;
+	return sign(vPc) * normalize(max(abs(vPc) - vSiz, 0.0));
+}
+
+// df/dx,df/dy,df/dx for f(x,y,z) = x^4 + y^4 + z^4 - ra^4
+float3 nSphere4(in float3 vPos, in float3 vCen)
+{
+	float3 vPc = vPos - vCen;
+	return normalize(vPc * vPc * vPc);
+}
+
+float3 nCapsule(in float3 vPos, in float3 vCen, in float3 a, in float3 b, in float r)
+{
+	float3 vPc = vPos - vCen;
+	float3  ba = b - a;
+	float3  pa = vPc - a;
+	float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+	return (pa - h * ba) / r;
+}
+
+// circular repitition, moved to and shifted within aa bounding box 
+float iCircularEllipsoids(in float3 vOri, in float3 vDir, in float fRad, in float fSpc, out float3 vNormal, out float2 vIdH, in float fTime)
+{
 	float fThit = -1.f;
-	for (int nJ = -16; nJ <= 16; nJ++)
-		for (int nI = -16; nI <= 16; nI++)
+	int nRad = int(fRad);
+	
+	// loop through grid int2(2*Rad, 2*Rad) 
+	for (int nJ = -nRad; nJ <= nRad; nJ++)
+		for (int nI = -nRad; nI <= nRad; nI++)
 		{
 			// is in radius ?
-			float2 vId = fId0 + float2(nI, nJ);
+			float2 vId = float2(nI, nJ);
 			if (dot(vId, vId) <= fRad * fRad)
 			{
 				// shift origin
@@ -253,11 +456,11 @@ float sdCircularEllipsoids(in float3 vOri, in float3 vDir, in float fRad, in flo
 				// rotate and lift ellipsoid
 				float fC = sqrt(dot(vId, vId));
 				float3 vRad = (fC < (fRad * .33)) ? float3(1.f, 1.5f, 1.f) : (fC < (fRad * .66)) ? float3(1.5f, 1.f, 1.f) : float3(1.f, 1.f, 1.5f);
-				vRad *= fSpc * .15f;
+				vRad *= fSpc * .08f;
 				float3 vPosE = float3(12.f, 1.5f + fC * sin(fTime * fC) * .2f, -32.f);
 
 				// ellipsoid intersection ?
-				float fH1 = isEllipsoid(vQ, vDir, vPosE, vRad);
+				float fH1 = iEllipsoid(vQ, vDir, vPosE, vRad);
 				if (fH1 >= 0.f)
 				{
 					// set nearest hit
@@ -267,7 +470,7 @@ float sdCircularEllipsoids(in float3 vOri, in float3 vDir, in float fRad, in flo
 					if (fThit == fH1)
 					{
 						float3 vPosition = vQ + fThit * vDir;
-						vNormal = nrEllipsoid(vPosition, vPosE, vRad);
+						vNormal = nEllipsoid(vPosition, vPosE, vRad);
 						vIdH = vId;
 					}
 				}
