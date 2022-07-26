@@ -28,7 +28,7 @@ Since these are very simple primitives (ellipsoids, rounded box, capsule), we ca
 
 * Candy loop
 
-Since the (endless) cylinder is intensely curved, we cannot use an intersector here, that would be very complicated, at least mathematically. So we also use Volume Ray Casting as we did in the first example.
+Since the (endless) cylinder is intensely curved, we cannot use an intersector here, that would be very complicated, at least mathematically. So we also use volume ray casting as we did in the first example.
 
 Video Link : https://youtu.be/SRQhpNWdLUs <br>
 
