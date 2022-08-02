@@ -4,6 +4,12 @@ Copyright © 2022 by Denis Reischl<br>
 
 SPDX-License-Identifier: MIT<br>
 
+Demos:  
+[1. Procedural Heightmap: Hex-tiled mesh (near), volume-ray-cast (far)](#demo1)  
+[2. Candy Land [DXR] : Raytraced procedural sweets](#demo2)  
+    
+<a name="demo1"/>
+
 ## 1. Procedural Heightmap: Hex-tiled mesh (near), volume-ray-cast (far)
 
 For any uneven primitive it is essential to use a hex tiled grid for its mesh in 3D. As we see by a (european) football, manufacturing it would be impossible using square leather pieces.
@@ -16,9 +22,11 @@ And so since that is the case i did choose the volume ray casting (raymarching) 
 
 Missing here : LOD can be easily applied by intersecting the hex triangles for closer tiles
 
-Video Link : https://youtu.be/DTHR7ZxROHY <br>
+[Video Link](https://youtu.be/DTHR7ZxROHY "Youtube") <br>
 
 [<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Proc_heightmap_01.PNG">]
+
+<a name="demo2"/>
 
 ## 2. Candy Land [DXR] : Raytraced procedural sweets
 
@@ -30,7 +38,8 @@ Since these are very simple primitives (ellipsoids, rounded box, capsule), we ca
 
 Since the (endless) cylinder is intensely curved, we cannot use an intersector here, that would be very complicated, at least mathematically. So we also use volume ray casting as we did in the first example.
 
-Video Link : https://youtu.be/SRQhpNWdLUs <br>
+[Video Link](https://youtu.be/SRQhpNWdLUs "Youtube") <br>
+[WebGL conversion](https://www.shadertoy.com/view/fdKfDc "Shadertoy") <br>
 
 [<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Candy_land_03.PNG">]
 
