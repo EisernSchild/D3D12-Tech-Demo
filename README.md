@@ -55,6 +55,7 @@ In this particular case, we treat voxels in 2D hexagonal space. That means we're
 Since these are volume elements, an adapted "Volume Ray Cast" method is also available here. I also use this technique here to render shadows and reflections.
 
 [Video Link](https://youtu.be/FDus7ldWWq0 "Youtube") <br>
+[WebGL conversion](https://www.shadertoy.com/view/fl3cDr "Shadertoy") <br>
 
 [<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Hex_city_01.PNG">]
 
