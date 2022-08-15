@@ -5,8 +5,9 @@ Copyright © 2022 by Denis Reischl<br>
 SPDX-License-Identifier: MIT<br>
 
 Demos:  
-[1. Procedural Heightmap: Hex-tiled mesh (near), volume-ray-cast (far)](#demo1)  
-[2. Candy Land [DXR] : Raytraced procedural sweets](#demo2)  
+[1. Procedural Heightmap: Hex-tiled mesh (near), volume-ray-cast (far)](#demo1) <br>
+[2. Candy Land [DXR] : Raytraced procedural sweets](#demo2) <br>
+[3. Hex Voxel City](#demo3) <br>
     
 <a name="demo1"/>
 
@@ -42,6 +43,20 @@ Since the (endless) cylinder is intensely curved, we cannot use an intersector h
 [WebGL conversion](https://www.shadertoy.com/view/fdKfDc "Shadertoy") <br>
 
 [<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Candy_land_03.PNG">]
+
+<a name="demo3"/>
+
+## 3. Hex Voxel City
+
+At least since the game "Comanche (1992)", the term "voxel" has become indispensable in the world of computer games. It means "volume element" or "volume pixel" and represents a value on a regular grid in three-dimensional space.
+
+In this particular case, we treat voxels in 2D hexagonal space. That means we're jumping the ray from triangle edge to edge to render these triangular towers.
+
+Since these are volume elements, an adapted "Volume Ray Cast" method is also available here. I also use this technique here to render shadows and reflections.
+
+[Video Link](https://youtu.be/FDus7ldWWq0 "Youtube") <br>
+
+[<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Hex_city_01.PNG">]
 
 ### Gamepad Controls
 

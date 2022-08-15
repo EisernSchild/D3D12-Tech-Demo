@@ -243,7 +243,7 @@ protected:
 			{
 			case Demos::Procedural_heightmap: return XMFLOAT3(0.f, 10.f, 0.f);
 			case Demos::Candy_cane: return XMFLOAT3(0.f, 1.f, -15.f);
-			case Demos::Hex_voxel_city: return XMFLOAT3(100.f, 12.f, 100.f);
+			case Demos::Hex_voxel_city: return XMFLOAT3(1000.f, 12.f, 1000.f);
 			default: break;
 			}
 			return XMFLOAT3(0.f, 0.f, 0.f);
