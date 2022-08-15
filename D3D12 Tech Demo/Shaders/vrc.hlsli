@@ -88,6 +88,85 @@ float HexGrid(float2 vPt)
 	return fD;
 }
 
+// cartesian to hex triangle index
+int2 HexTriangle(float2 vXy)
+{
+	// get hex uv global + local
+	float2 vHUv = HexUV(vXy);
+	float2 vHUvL = fmod(vHUv, 1.);
+	int nIx = int(floor(vHUv.x)) * 2;
+	nIx += (vHUvL.x > vHUvL.y) ? 0 : 1;
+	return int2(nIx, int(floor(vHUv.y)));
+}
+
+// cartesian to hex triangle index (float)
+float2 HexTriangleF(float2 vXy)
+{
+	// get hex uv global + local
+	float2 vHUv = HexUV(vXy);
+	float2 vHUvL = fmod(vHUv, 1.);
+	float fIx = floor(vHUv.x) * 2.;
+	fIx += (vHUvL.x > vHUvL.y) ? 1. : 0.;
+	return float2(fIx, floor(vHUv.y));
+}
+
+// hex triangle index to cartesian triangle center
+float2 HexCenterF(float2 vIx)
+{
+	float2 vHUv = floor(vIx * float2(.5, 1.));
+	vHUv += (fmod(vIx.x, 2.) < 1.) ? float2(.33333, .66666) : float2(.66666, .33333);
+	float2 vXy = HexXY(vHUv);
+	return vXy;
+}
+
+// provides the intersection point of the next triangle in a direction
+float2 iHexNextTriangle(float2 vXy, float2 vDir)
+{
+	// get hex uv global + local
+	float2 vHUv = HexUV(vXy);
+	float2 vHUvL = frac(vHUv);
+
+	// get direction in hex space, normalized
+	float2 vHDir = normalize(HexUV(vDir));
+
+	// get angles
+	float fA = atan2(.0 - vHUvL.y, .0 - vHUvL.x);
+	float fB = atan2(1. - vHUvL.y, 1. - vHUvL.x);
+	float fC = atan2(1. - vHUvL.y, .0 - vHUvL.x);
+	float fD = atan2(.0 - vHUvL.y, 1. - vHUvL.x);
+	float fE = atan2(vHDir.y, vHDir.x);
+
+	// get next intersection
+	if (vHUvL.x < vHUvL.y)
+	{
+		if ((fA < fE) && (fB >= fE))
+		{
+			float2 vA = ortho_proj(float2(1.f, 1.f), vHUvL);
+			float2 vB = ortho_proj(vA - vHUvL, vHDir);
+			vHUv += vHDir * (length(vHUvL - vA) / length(vB));
+		}
+		else if ((fB < fE) && (fC >= fE))
+			vHUv += vHDir * abs((1.f - vHUvL.y) / vHDir.y);
+		else
+			vHUv += vHDir * abs(vHUvL.x / vHDir.x);
+	}
+	else
+	{
+		if ((fA < fE) && (fD >= fE))
+			vHUv += vHDir * abs(vHUvL.y / vHDir.y);
+		else if ((fD < fE) && (fB >= fE))
+			vHUv += vHDir * abs((1.f - vHUvL.x) / vHDir.x);
+		else
+		{
+			float2 vA = ortho_proj(float2(1.f, 1.f), vHUvL);
+			float2 vB = ortho_proj(vA - vHUvL, vHDir);
+			vHUv += vHDir * (length(vHUvL - vA) / length(vB));
+		}
+	}
+
+	return HexXY(vHUv);
+}
+
 // transform a ray based on screen position, camera position and inverse wvp matrix 
 inline void transform_ray(in uint2 sIndex, in float2 sScreenSz, in float4 vCamPos, in float4x4 sWVPrInv,
 	out float3 vOrigin, out float3 vDirection)
@@ -479,7 +558,7 @@ float iCircularEllipsoids(in float3 vOri, in float3 vDir, in float fRad, in floa
 	return fThit;
 }
 
-// test function
+// function to bend the cylinder
 float fc(float fX)
 {
 	return sin(fX * .8) * .9 + 3. +cos(fX * .3);
@@ -487,7 +566,7 @@ float fc(float fX)
 	// return sin(fX * 3.) * .4  + 2.5 + cos(fX * .6);
 }
 
-// blanket function to wrap a any heightmap by tangent
+// blanket function to wrap any heightmap by tangent
 float4 modBlanket(float fX, float fR)
 {
 	// get height by function

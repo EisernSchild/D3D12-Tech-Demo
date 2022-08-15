@@ -64,13 +64,16 @@
     <FxCompile Include="..\..\Shaders\VS_phong.hlsl">
       <Filter>shader</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Shaders\CS_post.hlsl">
+    <FxCompile Include="..\..\Shaders\CS_demo00.hlsl">
       <Filter>shader</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\RS_library.hlsl">
       <Filter>shader</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\CS_hextrans.hlsl">
+      <Filter>shader</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\CS_demo02.hlsl">
       <Filter>shader</Filter>
     </FxCompile>
   </ItemGroup>

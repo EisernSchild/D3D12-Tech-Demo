@@ -34,7 +34,9 @@ public:
 		case Demos::Procedural_heightmap:
 			return APP_GfxLib::Draw_Demo_00(sData);
 		case Demos::Candy_cane:
-			return APP_GfxLib::Draw_Demo_01(sData);;
+			return APP_GfxLib::Draw_Demo_01(sData);
+		case Demos::Hex_voxel_city:
+			return APP_GfxLib::Draw_Demo_02(sData);
 		default: break;
 		}
 		return APP_FORWARD;

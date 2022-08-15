@@ -511,81 +511,20 @@ void App_D3D12::SetAndClearTarget()
 	m_sD3D.psCmdList->RSSetScissorRects(1, &m_sD3D.sScissorRc);
 }
 
-signed App_D3D12::Draw_Demo_00(const AppData& sData)
-{
-	// reset
-	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
-	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), m_sD3D.psPSO->Get()));
-
-	// transit to render target
-	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-
-	// viewport, scissor rect
-	m_sD3D.psCmdList->RSSetViewports(1, &m_sD3D.sScreenVp);
-	m_sD3D.psCmdList->RSSetScissorRects(1, &m_sD3D.sScissorRc);
-
-	// clear, use zero alpha
-	const float afColor[] = { 0.f, 0.f, 0.f, 0.f };
-	m_sD3D.psCmdList->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(
-		m_sD3D.psHeapRTV->GetCPUDescriptorHandleForHeapStart(),
-		m_sD3D.nBackbufferI,
-		m_sD3D.uRtvDcSz), afColor, 0, nullptr);
-	SetAndClearTarget();
-
-	// descriptor heaps, root signature
-	ID3D12DescriptorHeap* apsDHeaps[] = { m_sD3D.psHeapSRV.Get() };
-	m_sD3D.psCmdList->SetDescriptorHeaps(_countof(apsDHeaps), apsDHeaps);
-	m_sD3D.psCmdList->SetGraphicsRootSignature(m_sD3D.psRootSign.Get());
-
-	// vertex, index buffer - topology,... and draw skipping base hex tile
-	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcHexMesh->ViewV();
-	D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcHexMesh->ViewI();
-	m_sD3D.psCmdList->IASetVertexBuffers(0, 1, &sVBV);
-	m_sD3D.psCmdList->IASetIndexBuffer(&sIBV);
-	m_sD3D.psCmdList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(0, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::SceneConstants]);
-	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(1, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
-	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), 1, m_sScene.uBaseIdcN, 0, 0);
-
-	// update the hex tiles, first the offsets, then the tiles ( move that later... )
-	UpdateHexOffsets(D3D12_RESOURCE_STATE_GENERIC_READ);
-	OffsetTiles(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(), m_sD3D.psPsoCsHexTrans.Get());
-
-	// execute post processing
-	ExecutePost(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(),
-		m_sD3D.psPsoCsPost.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get());
-
-	// transit to copy destination (is in copy source due to post processing execution), copy, transit to present
-	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
-		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
-	m_sD3D.psCmdList->CopyResource(m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(), m_sD3D.psRenderMap1.Get());
-	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
-		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-
-	// close list and execute
-	ThrowIfFailed(m_sD3D.psCmdList->Close());
-	ID3D12CommandList* asCmdLists[] = { m_sD3D.psCmdList.Get() };
-	m_sD3D.psCmdQueue->ExecuteCommandLists(_countof(asCmdLists), asCmdLists);
-
-	// present and swap
-	ThrowIfFailed(m_sD3D.psSwapchain->Present(0, 0));
-	m_sD3D.nBackbufferI = (m_sD3D.nBackbufferI + 1) % nSwapchainBufferN;
-
-	// sync
-	return FlushCommandQueue();
-}
-
-void App_D3D12::ExecutePost(ID3D12GraphicsCommandList* psCmdList,
+void App_D3D12::ExecuteCompute(ID3D12GraphicsCommandList* psCmdList,
 	ID3D12RootSignature* psRootSign,
 	ID3D12PipelineState* psPSO,
-	ID3D12Resource* psInput)
+	ID3D12Resource* psInput,
+	bool bCopyTarget)
 {
-	// copy the back-buffer to first post map, transit to generic read
-	CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, psInput, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-	CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, m_sD3D.psRenderMap0.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
-	psCmdList->CopyResource(m_sD3D.psRenderMap0.Get(), psInput);
-	CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, m_sD3D.psRenderMap0.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+	if (bCopyTarget)
+	{
+		// copy the back-buffer to first post map, transit to generic read
+		CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, psInput, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+		CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, m_sD3D.psRenderMap0.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
+		psCmdList->CopyResource(m_sD3D.psRenderMap0.Get(), psInput);
+		CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, m_sD3D.psRenderMap0.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+	}
 
 	// transit second map to unordered access
 	CD3DX12_RB_TRANSITION::ResourceBarrier(psCmdList, m_sD3D.psRenderMap1.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -800,12 +739,12 @@ signed App_D3D12::CreateShaders()
 		ThrowIfFailed(nHr);
 	}
 
-	// compute shader post
+	// compute shader Demo 00
 	{
 		// compile...
 		D3D_SHADER_MACRO sMacro = {};
 		ComPtr<ID3DBlob> psCsByteCode = nullptr;
-		ThrowIfFailed(D3DReadFileToBlob(L"CS_post.cso", &psCsByteCode));
+		ThrowIfFailed(D3DReadFileToBlob(L"CS_demo00.cso", &psCsByteCode));
 
 		// Create compute pipeline state
 		D3D12_COMPUTE_PIPELINE_STATE_DESC psPsoDc = {};
@@ -813,8 +752,25 @@ signed App_D3D12::CreateShaders()
 		psPsoDc.CS = { reinterpret_cast<BYTE*>(psCsByteCode->GetBufferPointer()), psCsByteCode->GetBufferSize() };
 
 		ThrowIfFailed(
-			m_sD3D.psDevice->CreateComputePipelineState(&psPsoDc, IID_PPV_ARGS(m_sD3D.psPsoCsPost.ReleaseAndGetAddressOf())));
-		m_sD3D.psPsoCsPost->SetName(L"compute post PSO");
+			m_sD3D.psDevice->CreateComputePipelineState(&psPsoDc, IID_PPV_ARGS(m_sD3D.psPsoCsDemo00.ReleaseAndGetAddressOf())));
+		m_sD3D.psPsoCsDemo00->SetName(L"compute demo00 PSO");
+	}
+
+	// compute shader Demo 02
+	{
+		// compile...
+		D3D_SHADER_MACRO sMacro = {};
+		ComPtr<ID3DBlob> psCsByteCode = nullptr;
+		ThrowIfFailed(D3DReadFileToBlob(L"CS_demo02.cso", &psCsByteCode));
+
+		// Create compute pipeline state
+		D3D12_COMPUTE_PIPELINE_STATE_DESC psPsoDc = {};
+		psPsoDc.pRootSignature = m_sD3D.psRootSignCS.Get();
+		psPsoDc.CS = { reinterpret_cast<BYTE*>(psCsByteCode->GetBufferPointer()), psCsByteCode->GetBufferSize() };
+
+		ThrowIfFailed(
+			m_sD3D.psDevice->CreateComputePipelineState(&psPsoDc, IID_PPV_ARGS(m_sD3D.psPsoCsDemo02.ReleaseAndGetAddressOf())));
+		m_sD3D.psPsoCsDemo02->SetName(L"compute demo02 PSO");
 	}
 
 	// compute shader hex trans
@@ -1404,6 +1360,90 @@ void App_D3D12::DoRaytracing()
 	DispatchRays(psCmdList, m_sD3D.psDXRStateObject.Get(), &sDispDc);
 }
 
+void App_D3D12::RenderMap2Backbuffer()
+{
+	auto psCmdList = m_sD3D.psCmdList.Get();
+	auto psTarget = m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get();
+
+	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(psTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_sD3D.psRenderMap0.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	psCmdList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+
+	psCmdList->CopyResource(psTarget, m_sD3D.psRenderMap0.Get());
+
+	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(psTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_sD3D.psRenderMap0.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+	psCmdList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+}
+
+signed App_D3D12::Draw_Demo_00(const AppData& sData)
+{
+	// reset
+	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
+	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), m_sD3D.psPSO->Get()));
+
+	// transit to render target
+	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
+		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+	// viewport, scissor rect
+	m_sD3D.psCmdList->RSSetViewports(1, &m_sD3D.sScreenVp);
+	m_sD3D.psCmdList->RSSetScissorRects(1, &m_sD3D.sScissorRc);
+
+	// clear, use zero alpha
+	const float afColor[] = { 0.f, 0.f, 0.f, 0.f };
+	m_sD3D.psCmdList->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(
+		m_sD3D.psHeapRTV->GetCPUDescriptorHandleForHeapStart(),
+		m_sD3D.nBackbufferI,
+		m_sD3D.uRtvDcSz), afColor, 0, nullptr);
+	SetAndClearTarget();
+
+	// descriptor heaps, root signature
+	ID3D12DescriptorHeap* apsDHeaps[] = { m_sD3D.psHeapSRV.Get() };
+	m_sD3D.psCmdList->SetDescriptorHeaps(_countof(apsDHeaps), apsDHeaps);
+	m_sD3D.psCmdList->SetGraphicsRootSignature(m_sD3D.psRootSign.Get());
+
+	// vertex, index buffer - topology,... and draw skipping base hex tile
+	D3D12_VERTEX_BUFFER_VIEW sVBV = m_sD3D.pcHexMesh->ViewV();
+	D3D12_INDEX_BUFFER_VIEW sIBV = m_sD3D.pcHexMesh->ViewI();
+	m_sD3D.psCmdList->IASetVertexBuffers(0, 1, &sVBV);
+	m_sD3D.psCmdList->IASetIndexBuffer(&sIBV);
+	m_sD3D.psCmdList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(0, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::SceneConstants]);
+	m_sD3D.psCmdList->SetGraphicsRootDescriptorTable(1, m_sD3D.asCbvSrvUavGpuH[(uint)CbvSrvUav_Heap_Idc::TileOffsetSrv]);
+	m_sD3D.psCmdList->DrawIndexedInstanced(m_sD3D.pcHexMesh->Indices_N(), 1, m_sScene.uBaseIdcN, 0, 0);
+
+	// update the hex tiles, first the offsets, then the tiles ( move that later... )
+	UpdateHexOffsets(D3D12_RESOURCE_STATE_GENERIC_READ);
+	OffsetTiles(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(), m_sD3D.psPsoCsHexTrans.Get());
+
+	// execute volume ray cast
+	ExecuteCompute(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(),
+		m_sD3D.psPsoCsDemo00.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(), true);
+
+	// transit to copy destination (is in copy source due to post processing execution), copy, transit to present
+	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
+		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+	m_sD3D.psCmdList->CopyResource(m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(), m_sD3D.psRenderMap1.Get());
+	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+
+	// close list and execute
+	ThrowIfFailed(m_sD3D.psCmdList->Close());
+	ID3D12CommandList* asCmdLists[] = { m_sD3D.psCmdList.Get() };
+	m_sD3D.psCmdQueue->ExecuteCommandLists(_countof(asCmdLists), asCmdLists);
+
+	// present and swap
+	ThrowIfFailed(m_sD3D.psSwapchain->Present(0, 0));
+	m_sD3D.nBackbufferI = (m_sD3D.nBackbufferI + 1) % nSwapchainBufferN;
+
+	// sync
+	return FlushCommandQueue();
+}
+
 signed App_D3D12::Draw_Demo_01(const AppData& sData)
 {
 	// reset
@@ -1435,23 +1475,55 @@ signed App_D3D12::Draw_Demo_01(const AppData& sData)
 	return FlushCommandQueue();
 }
 
-void App_D3D12::RenderMap2Backbuffer()
+signed App_D3D12::Draw_Demo_02(const AppData& sData)
 {
-	auto psCmdList = m_sD3D.psCmdList.Get();
-	auto psTarget = m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get();
+	// reset
+	ThrowIfFailed(m_sD3D.psCmdListAlloc->Reset());
+	ThrowIfFailed(m_sD3D.psCmdList->Reset(m_sD3D.psCmdListAlloc.Get(), m_sD3D.psPSO->Get()));
 
-	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(psTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
-	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_sD3D.psRenderMap0.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-	psCmdList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+	// transit to render target
+	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
+		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-	psCmdList->CopyResource(psTarget, m_sD3D.psRenderMap0.Get());
+	// viewport, scissor rect
+	m_sD3D.psCmdList->RSSetViewports(1, &m_sD3D.sScreenVp);
+	m_sD3D.psCmdList->RSSetScissorRects(1, &m_sD3D.sScissorRc);
 
-	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
-	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(psTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
-	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_sD3D.psRenderMap0.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	// clear, use zero alpha
+	const float afColor[] = { 0.f, 0.f, 0.f, 0.f };
+	m_sD3D.psCmdList->ClearRenderTargetView(CD3DX12_CPU_DESCRIPTOR_HANDLE(
+		m_sD3D.psHeapRTV->GetCPUDescriptorHandleForHeapStart(),
+		m_sD3D.nBackbufferI,
+		m_sD3D.uRtvDcSz), afColor, 0, nullptr);
+	SetAndClearTarget();
 
-	psCmdList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+	// descriptor heaps, root signature
+	ID3D12DescriptorHeap* apsDHeaps[] = { m_sD3D.psHeapSRV.Get() };
+	m_sD3D.psCmdList->SetDescriptorHeaps(_countof(apsDHeaps), apsDHeaps);
+	m_sD3D.psCmdList->SetGraphicsRootSignature(m_sD3D.psRootSign.Get());
+
+	// execute hexagonal volume ray cast
+	ExecuteCompute(m_sD3D.psCmdList.Get(), m_sD3D.psRootSignCS.Get(),
+		m_sD3D.psPsoCsDemo02.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(), false);
+
+	// transit to copy destination (is in copy source due to post processing execution), copy, transit to present
+	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
+		D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+	m_sD3D.psCmdList->CopyResource(m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(), m_sD3D.psRenderMap1.Get());
+	CD3DX12_RB_TRANSITION::ResourceBarrier(m_sD3D.psCmdList.Get(), m_sD3D.apsBufferSC[m_sD3D.nBackbufferI].Get(),
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+
+	// close list and execute
+	ThrowIfFailed(m_sD3D.psCmdList->Close());
+	ID3D12CommandList* asCmdLists[] = { m_sD3D.psCmdList.Get() };
+	m_sD3D.psCmdQueue->ExecuteCommandLists(_countof(asCmdLists), asCmdLists);
+
+	// present and swap
+	ThrowIfFailed(m_sD3D.psSwapchain->Present(0, 0));
+	m_sD3D.nBackbufferI = (m_sD3D.nBackbufferI + 1) % nSwapchainBufferN;
+
+	// sync
+	return FlushCommandQueue();
 }
 
 

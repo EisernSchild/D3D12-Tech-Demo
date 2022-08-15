@@ -15,12 +15,13 @@
 enum struct Demos : unsigned
 {
 	Procedural_heightmap,
-	Candy_cane
+	Candy_cane,
+	Hex_voxel_city
 };
 /// <summary>number of demos using rasterization</summary>
 static constexpr uint uDemoRasN = 1;
 /// <summary>number of demos using both rasterization and raytracing</summary>
-static constexpr uint uDemoN = 2;
+static constexpr uint uDemoN = 3;
 
 #ifdef _WIN64
 
@@ -60,13 +61,12 @@ protected:
 	static signed UpdateConstants(const AppData& sData);
 	/// <summary>clear render target</summary>
 	static void SetAndClearTarget();
-	/// <summary>Demo 00 render method</summary>
-	static signed Draw_Demo_00(const AppData& sData);
-	/// <summary>Compute shader post processing</summary>
-	static void ExecutePost(ID3D12GraphicsCommandList* psCmdList,
+	/// <summary>Compute shader execution method</summary>
+	static void ExecuteCompute(ID3D12GraphicsCommandList* psCmdList,
 		ID3D12RootSignature* psRootSign,
 		ID3D12PipelineState* psPSO,
-		ID3D12Resource* psInput);
+		ID3D12Resource* psInput,
+		bool bCopyTarget);
 	/// <summary>Create the descriptor heaps for the scene</summary>
 	static signed CreateSceneDHeaps();
 	/// <summary>Create scene constant buffer</summary>
@@ -87,14 +87,18 @@ protected:
 	static void BuildDXRShaderTables();
 	/// <summary>execute raytracing</summary>
 	static void DoRaytracing();
-	/// <summary>Demo 01 render method</summary>
-	static signed Draw_Demo_01(const AppData& sData);
 	/// <summary>copy RenderMap0 to render target (back buffer)</summary>
 	static void RenderMap2Backbuffer();
 	/// <summary>translate hex tiles by compute shader</summary>
 	static void OffsetTiles(ID3D12GraphicsCommandList* psCmdList,
 		ID3D12RootSignature* psRootSign,
 		ID3D12PipelineState* psPSO);
+	/// <summary>Demo 00 render method</summary>
+	static signed Draw_Demo_00(const AppData& sData);
+	/// <summary>Demo 01 render method</summary>
+	static signed Draw_Demo_01(const AppData& sData);
+	/// <summary>Demo 01 render method</summary>
+	static signed Draw_Demo_02(const AppData& sData);
 	/// <summary>Double back buffer ( = 2 )</summary>
 	static constexpr int nSwapchainBufferN = 2;
 
@@ -152,8 +156,10 @@ protected:
 		ComPtr<ID3D12DescriptorHeap> psHeapRTV;
 		/// <summary>depth stencil view descriptor heap</summary>
 		ComPtr<ID3D12DescriptorHeap> psHeapDSV;
-		/// <summary>the pipeline state object (compute shader post)</summary>
-		ComPtr<ID3D12PipelineState> psPsoCsPost = nullptr;
+		/// <summary>the pipeline state object (compute shader Demo 00)</summary>
+		ComPtr<ID3D12PipelineState> psPsoCsDemo00 = nullptr;
+		/// <summary>the pipeline state object (compute shader Demo 02)</summary>
+		ComPtr<ID3D12PipelineState> psPsoCsDemo02 = nullptr;
 		/// <summary>the pipeline state object (compute shader hex translate)</summary>
 		ComPtr<ID3D12PipelineState> psPsoCsHexTrans = nullptr;
 		/// <summary>shader (compute) root signature</summary>
@@ -213,6 +219,7 @@ protected:
 			{
 			case Demos::Procedural_heightmap: return .1f;
 			case Demos::Candy_cane: return .05f;
+			case Demos::Hex_voxel_city: return .05f;
 			default: break;
 			}
 			return 0.f;
@@ -224,6 +231,7 @@ protected:
 			{
 			case Demos::Procedural_heightmap: return 4.f;
 			case Demos::Candy_cane: return 2.f;
+			case Demos::Hex_voxel_city: return 2.f;
 			default: break;
 			}
 			return 0.f;
@@ -235,6 +243,7 @@ protected:
 			{
 			case Demos::Procedural_heightmap: return XMFLOAT3(0.f, 10.f, 0.f);
 			case Demos::Candy_cane: return XMFLOAT3(0.f, 1.f, -15.f);
+			case Demos::Hex_voxel_city: return XMFLOAT3(100.f, 12.f, 100.f);
 			default: break;
 			}
 			return XMFLOAT3(0.f, 0.f, 0.f);
