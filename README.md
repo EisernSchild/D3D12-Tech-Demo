@@ -21,10 +21,6 @@ For closer terrain this is the best option, but for distant terrain this would n
 
 And so since that is the case i did choose the volume ray casting (raymarching) method for distant terrain. Raymarching means, other than raytracing, that the ray "walks" step by step through the viewport. This technique is used in the compute shader during post processing.
 
-Missing here : LOD can be easily applied by intersecting the hex triangles for closer tiles
-
-[Video Link](https://youtu.be/DTHR7ZxROHY "Youtube") <br>
-
 [<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Proc_heightmap_01.PNG">]
 
 <a name="demo2"/>
@@ -39,7 +35,6 @@ Since these are very simple primitives (ellipsoids, rounded box, capsule), we ca
 
 Since the (endless) cylinder is intensely curved, we cannot use an intersector here, that would be very complicated, at least mathematically. So we also use volume ray casting as we did in the first example.
 
-[Video Link](https://youtu.be/SRQhpNWdLUs "Youtube") <br>
 [WebGL conversion](https://www.shadertoy.com/view/fdKfDc "Shadertoy") <br>
 
 [<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Candy_land_03.PNG">]
@@ -54,7 +49,6 @@ In this particular case, we treat voxels in 2D hexagonal space. That means we're
 
 Since these are volume elements, an adapted "Volume Ray Cast" method is also available here. I also use this technique here to render shadows and reflections.
 
-[Video Link](https://youtu.be/FDus7ldWWq0 "Youtube") <br>
 [WebGL conversion](https://www.shadertoy.com/view/fl3cDr "Shadertoy") <br>
 
 [<img src="https://github.com/EisernSchild/D3D12-Tech-Demo/blob/main/media/Hex_city_01.PNG">]
